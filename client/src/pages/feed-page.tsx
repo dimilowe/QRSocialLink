@@ -96,7 +96,7 @@ export default function FeedPage() {
     setShowScanner(false);
     
     let urlToOpen = decodedUrl;
-    if (!decodedUrl.match(/^https?:\/\//i)) {
+    if (!decodedUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)) {
       urlToOpen = `https://${decodedUrl}`;
     }
     window.open(urlToOpen, "_blank");

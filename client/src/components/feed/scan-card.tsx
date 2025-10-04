@@ -41,7 +41,7 @@ export function ScanCard({
   const handleRescan = () => {
     const targetUrl = scan.redirectUrl || scan.decodedUrl;
     let urlToOpen = targetUrl;
-    if (!targetUrl.match(/^https?:\/\//i)) {
+    if (!targetUrl.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)) {
       urlToOpen = `https://${targetUrl}`;
     }
     window.open(urlToOpen, "_blank");
