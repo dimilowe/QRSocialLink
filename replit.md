@@ -1,6 +1,6 @@
 # QR Social
 
-A social QR code scanning platform built with Next.js, Supabase, and Stripe.
+A social QR code scanning platform built with Next.js, Neon PostgreSQL, and Stripe.
 
 ## Overview
 QR Social is a full-stack web application that allows users to scan QR codes, share them on a social feed, and interact with other users' scans. The platform includes a freemium model with Pro subscriptions.
@@ -8,7 +8,7 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 ## Tech Stack
 - **Frontend**: React, TypeScript, Tailwind CSS, Wouter (routing), TanStack Query, Shadcn UI
 - **Backend**: Express.js, Node.js, Passport.js (authentication)
-- **Database**: Supabase PostgreSQL with Drizzle ORM
+- **Database**: Neon PostgreSQL with Drizzle ORM
 - **Payments**: Stripe (subscription management)
 - **QR Scanning**: html5-qrcode (camera), jsqr (image upload), qrcode (generation)
 
@@ -101,7 +101,7 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - POST `/api/webhooks/stripe` - Stripe webhook endpoint for subscription events
 
 ## Environment Variables Required
-- `DATABASE_URL` - Supabase PostgreSQL connection string
+- `DATABASE_URL` - Neon PostgreSQL connection string
 - `SESSION_SECRET` - Session encryption key
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key
@@ -115,7 +115,8 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Automatic plan updates based on subscription status
 - Backend enforcement of free tier 10-scan limit
 - Fixed Stripe API version and free tier enforcement
-- Database schema deployed to Supabase
+- **Migrated from Supabase to Neon PostgreSQL** - Resolved SSL certificate issues by switching to Neon database with proven neon-serverless driver configuration
+- Database schema deployed to Neon
 - Theme toggle system implemented
 - Responsive design with mobile navigation
 
