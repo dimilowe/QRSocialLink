@@ -20,6 +20,7 @@ export const scans = pgTable("scans", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   qrImageUrl: text("qr_image_url").notNull(),
   decodedUrl: text("decoded_url").notNull(),
+  redirectUrl: text("redirect_url"),
   title: text("title"),
   isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

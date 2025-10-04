@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Heart, MessageCircle, ExternalLink, UserPlus, UserCheck } from "lucide-react";
+import { Heart, MessageCircle, ExternalLink, UserPlus, UserCheck, Edit } from "lucide-react";
 import { ScanWithUser } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -12,30 +12,36 @@ import { CommentSection } from "./comment-section";
 interface ScanCardProps {
   scan: ScanWithUser;
   currentUserId?: string;
+  currentUserPlan?: string;
   onLike: (scanId: string) => void;
   onFollow: (userId: string) => void;
   onRescan: (url: string) => void;
+  onEdit?: (scan: ScanWithUser) => void;
   isFollowing: boolean;
 }
 
 export function ScanCard({
   scan,
   currentUserId,
+  currentUserPlan,
   onLike,
   onFollow,
   onRescan,
+  onEdit,
   isFollowing,
 }: ScanCardProps) {
   const [showComments, setShowComments] = useState(false);
   const isOwnScan = currentUserId === scan.userId;
+  const canEdit = isOwnScan && currentUserPlan === "pro" && onEdit;
 
   const getInitials = (username: string) => {
     return username.slice(0, 2).toUpperCase();
   };
 
   const handleRescan = () => {
-    window.open(scan.decodedUrl, "_blank");
-    onRescan(scan.decodedUrl);
+    const targetUrl = scan.redirectUrl || scan.decodedUrl;
+    window.open(targetUrl, "_blank");
+    onRescan(targetUrl);
   };
 
   return (
@@ -108,18 +114,38 @@ export function ScanCard({
           <p className="font-medium" data-testid="text-scan-title">{scan.title}</p>
         )}
         
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <ExternalLink className="h-4 w-4 flex-shrink-0" />
-          <a
-            href={scan.decodedUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="truncate hover:text-foreground transition-colors"
-            data-testid="link-decoded-url"
-          >
-            {scan.decodedUrl}
-          </a>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-1 min-w-0">
+            <ExternalLink className="h-4 w-4 flex-shrink-0" />
+            <a
+              href={scan.redirectUrl || scan.decodedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate hover:text-foreground transition-colors"
+              data-testid="link-decoded-url"
+            >
+              {scan.redirectUrl || scan.decodedUrl}
+            </a>
+          </div>
+          
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(scan)}
+              data-testid={`button-edit-${scan.id}`}
+              className="flex-shrink-0"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+        
+        {scan.redirectUrl && (
+          <p className="text-xs text-muted-foreground">
+            Original: {scan.decodedUrl}
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-4 pt-2 border-t">

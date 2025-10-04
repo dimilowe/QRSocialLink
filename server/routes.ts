@@ -39,6 +39,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/scans/:id/redirect", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const scan = await storage.getScan(req.params.id);
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      if (scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to edit this scan" });
+      }
+
+      if (req.user.plan !== "pro") {
+        return res.status(403).json({ message: "Pro plan required for dynamic QR updates" });
+      }
+
+      const { redirectUrl } = req.body;
+      
+      if (redirectUrl === null || redirectUrl === "") {
+        const updatedScan = await storage.updateScanRedirectUrl(req.params.id, null);
+        return res.json(updatedScan);
+      }
+      
+      if (typeof redirectUrl !== "string") {
+        return res.status(400).json({ message: "Invalid redirect URL" });
+      }
+
+      try {
+        const url = new URL(redirectUrl);
+        if (!url.protocol.startsWith('https')) {
+          return res.status(400).json({ message: "Redirect URLs must use HTTPS for security" });
+        }
+      } catch {
+        return res.status(400).json({ message: "Invalid URL format" });
+      }
+
+      const updatedScan = await storage.updateScanRedirectUrl(req.params.id, redirectUrl);
+      res.json(updatedScan);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/users/:id", async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);

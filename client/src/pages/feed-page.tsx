@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { QrScanner } from "@/components/scanner/qr-scanner";
 import { ProUpgradeModal } from "@/components/pro-upgrade-modal";
+import { EditQRModal } from "@/components/edit-qr-modal";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -16,6 +17,8 @@ export default function FeedPage() {
   const { toast } = useToast();
   const [showScanner, setShowScanner] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedScan, setSelectedScan] = useState<ScanWithUser | null>(null);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
   const { data: feed = [], isLoading } = useQuery<ScanWithUser[]>({
@@ -164,9 +167,14 @@ export default function FeedPage() {
                 key={scan.id}
                 scan={scan}
                 currentUserId={user?.id}
+                currentUserPlan={user?.plan}
                 onLike={(scanId) => likeMutation.mutate(scanId)}
                 onFollow={(userId) => followMutation.mutate(userId)}
                 onRescan={handleRescan}
+                onEdit={(scan) => {
+                  setSelectedScan(scan);
+                  setShowEditModal(true);
+                }}
                 isFollowing={followingIds.has(scan.userId)}
               />
             ))}
@@ -193,6 +201,11 @@ export default function FeedPage() {
       )}
 
       <ProUpgradeModal open={showProModal} onOpenChange={setShowProModal} />
+      <EditQRModal 
+        scan={selectedScan} 
+        open={showEditModal} 
+        onOpenChange={setShowEditModal} 
+      />
     </div>
   );
 }
