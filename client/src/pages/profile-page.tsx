@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Crown, Settings, ExternalLink } from "lucide-react";
+import { Crown, Settings, ExternalLink, Loader2 } from "lucide-react";
 import { User, Scan } from "@shared/schema";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,10 +27,33 @@ export default function ProfilePage() {
     enabled: !!userId,
   });
 
-  const { data: scans = [], isLoading: scansLoading } = useQuery<Scan[]>({
+  const {
+    data: scansData,
+    isLoading: scansLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<{
+    scans: Scan[];
+    hasMore: boolean;
+    total: number;
+    page?: number;
+  }>({
     queryKey: ["/api/users", userId, "scans"],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await fetch(`/api/users/${userId}/scans?page=${pageParam}&pageSize=20`);
+      if (!response.ok) throw new Error("Failed to fetch scans");
+      return response.json();
+    },
+    getNextPageParam: (lastPage) => 
+      lastPage.hasMore && lastPage.page ? lastPage.page + 1 : undefined,
     enabled: !!userId,
+    initialPageParam: 1,
   });
+
+  const scans = scansData?.pages.flatMap(page => page.scans) || [];
+  const totalScans = scansData?.pages[0]?.total || 0;
+  const canLoadMore = profile?.plan === "pro" && hasNextPage;
 
   const { data: stats } = useQuery<{
     scansCount: number;
@@ -55,8 +78,7 @@ export default function ProfilePage() {
     return username.slice(0, 2).toUpperCase();
   };
 
-  const displayedScans = profile?.plan === "free" ? scans.slice(0, 10) : scans;
-  const hasMoreScans = profile?.plan === "free" && scans.length > 10;
+  const isFreePlanMaxed = profile?.plan === "free" && scans.length >= 10;
 
   if (profileLoading) {
     return (
@@ -174,14 +196,25 @@ export default function ProfilePage() {
                     <Skeleton key={i} className="aspect-square" />
                   ))}
                 </div>
-              ) : displayedScans.length === 0 ? (
+              ) : scans.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No scans yet</p>
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {profile.plan === "pro" && totalScans > 0 && (
+                    <Card className="p-3 bg-gradient-to-r from-[hsl(var(--pro-badge-from))]/10 to-[hsl(var(--pro-badge-to))]/10 border-[hsl(var(--pro-badge-from))]/20">
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-[hsl(var(--pro-badge-from))]" />
+                        <p className="text-sm font-medium">
+                          Pro: Unlimited scan history ({totalScans} total scans)
+                        </p>
+                      </div>
+                    </Card>
+                  )}
+                  
                   <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                    {displayedScans.map((scan) => (
+                    {scans.map((scan) => (
                       <button
                         key={scan.id}
                         className="aspect-square bg-white rounded-lg p-2 hover-elevate active-elevate-2 group relative overflow-visible"
@@ -198,26 +231,47 @@ export default function ProfilePage() {
                         </div>
                       </button>
                     ))}
-                    
-                    {hasMoreScans && (
-                      <button
-                        className="aspect-square border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 hover-elevate"
-                        onClick={() => setShowProModal(true)}
-                        data-testid="button-unlock-more"
-                      >
-                        <Crown className="h-6 w-6 text-[hsl(var(--pro-badge-from))]" />
-                        <span className="text-xs text-muted-foreground">
-                          +{scans.length - 10} more
-                        </span>
-                      </button>
-                    )}
                   </div>
+
+                  {canLoadMore && (
+                    <div className="flex justify-center pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                        data-testid="button-load-more-scans"
+                      >
+                        {isFetchingNextPage ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          `Load More Scans`
+                        )}
+                      </Button>
+                    </div>
+                  )}
                   
-                  {hasMoreScans && (
-                    <Card className="p-4">
-                      <p className="text-sm text-muted-foreground text-center">
-                        Free plan shows last 10 scans. Upgrade to Pro for unlimited history.
-                      </p>
+                  {isFreePlanMaxed && (
+                    <Card className="p-4 border-[hsl(var(--pro-badge-from))]/30">
+                      <div className="text-center">
+                        <Crown className="h-8 w-8 mx-auto mb-2 text-[hsl(var(--pro-badge-from))]" />
+                        <p className="text-sm font-medium mb-1">
+                          Free plan limit reached (10 scans)
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Upgrade to Pro for unlimited scan history
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowProModal(true)}
+                          data-testid="button-upgrade-history-limit"
+                        >
+                          <Crown className="h-3 w-3 mr-1" />
+                          Upgrade to Pro
+                        </Button>
+                      </div>
                     </Card>
                   )}
                 </div>

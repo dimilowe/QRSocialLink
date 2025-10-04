@@ -54,14 +54,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users/:id/scans", async (req, res) => {
     try {
-      const user = await storage.getUser(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const profileUserId = req.params.id;
+      const isOwnProfile = req.isAuthenticated() && req.user.id === profileUserId;
+      const currentUserPlan = req.user?.plan || "free";
       
-      const limit = user.plan === "free" ? 10 : undefined;
-      const scans = await storage.getUserScans(req.params.id, limit);
-      res.json(scans);
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 20;
+      
+      const stats = await storage.getUserStats(profileUserId);
+      
+      if (isOwnProfile && currentUserPlan === "pro") {
+        const offset = (page - 1) * pageSize;
+        const scans = await storage.getUserScansPaginated(profileUserId, pageSize, offset);
+        res.json({ 
+          scans, 
+          hasMore: offset + scans.length < stats.scansCount,
+          total: stats.scansCount,
+          page,
+          pageSize
+        });
+      } else {
+        const scans = await storage.getUserScans(profileUserId, 10);
+        res.json({ 
+          scans, 
+          hasMore: isOwnProfile && stats.scansCount > 10, 
+          total: stats.scansCount,
+          page: 1,
+          pageSize: 10
+        });
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
