@@ -10,6 +10,7 @@ import AuthPage from "@/pages/auth-page";
 import FeedPage from "@/pages/feed-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
+import CreateQRPage from "@/pages/create-qr-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -51,6 +52,7 @@ function Router() {
           }}
         </Route>
         <Route path="/" component={() => <ProtectedRoute component={FeedPage} />} />
+        <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route component={NotFound} />

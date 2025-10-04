@@ -1,4 +1,4 @@
-import { Home, QrCode, Bell, User } from "lucide-react";
+import { Home, Plus, Bell, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -16,9 +16,9 @@ export function BottomNav() {
       path: "/",
     },
     {
-      icon: QrCode,
-      label: "Scan",
-      path: "/scan",
+      icon: Plus,
+      label: "Create",
+      path: "/create",
     },
     {
       icon: Bell,
