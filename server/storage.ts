@@ -27,6 +27,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserStripeInfo(
     userId: string,
@@ -81,6 +82,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.email, email))
+      .limit(1);
+    return result[0];
+  }
+
+  async getUserByStripeCustomerId(customerId: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.stripeCustomerId, customerId))
       .limit(1);
     return result[0];
   }

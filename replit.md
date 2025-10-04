@@ -98,20 +98,37 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 
 ### Subscription
 - POST `/api/get-or-create-subscription` - Create or retrieve Stripe subscription
+- POST `/api/webhooks/stripe` - Stripe webhook endpoint for subscription events
 
 ## Environment Variables Required
 - `DATABASE_URL` - Supabase PostgreSQL connection string
 - `SESSION_SECRET` - Session encryption key
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for webhook signature verification)
 
 ## Recent Changes (October 2025)
 - Initial MVP implementation completed
 - All core features functional
-- Stripe subscription flow integrated
+- Stripe subscription flow integrated with webhook handling
+- Webhook endpoint processes subscription events (invoice.paid, subscription.updated, subscription.deleted)
+- Automatic plan updates based on subscription status
+- Backend enforcement of free tier 10-scan limit
+- Fixed Stripe API version and free tier enforcement
 - Database schema deployed to Supabase
 - Theme toggle system implemented
 - Responsive design with mobile navigation
+
+## Stripe Webhook Configuration
+To enable automatic subscription management:
+1. Go to Stripe Dashboard → Developers → Webhooks
+2. Add endpoint URL: `https://your-replit-url.replit.app/api/webhooks/stripe`
+3. Select events to listen for:
+   - `invoice.paid` - Upgrades user to Pro when payment succeeds
+   - `customer.subscription.updated` - Updates plan based on subscription status
+   - `customer.subscription.deleted` - Downgrades user to Free when subscription cancelled
+   - `invoice.payment_failed` - Logs payment failures
+4. Copy the webhook signing secret to `STRIPE_WEBHOOK_SECRET` environment variable
 
 ## Known Limitations / Future Enhancements
 - QR Drops feature UI created but backend not fully implemented
@@ -119,4 +136,5 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Branded QR skins not implemented
 - No real-time feed updates (polling only)
 - Avatar upload not yet implemented (using default avatars)
-- Free tier scan limit not enforced yet (shows last 10 but all are stored)
+- Dynamic QR URL updates not implemented
+- Rescan/repost functionality not implemented
