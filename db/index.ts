@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 
 if (!process.env.DATABASE_URL) {
@@ -7,7 +8,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const db = drizzle({
-  connection: process.env.DATABASE_URL,
-  ws: ws,
+neonConfig.webSocketConstructor = ws;
+
+const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
+
+export const db = drizzle({ client: pool });
