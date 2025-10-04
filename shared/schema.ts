@@ -22,6 +22,7 @@ export const scans = pgTable("scans", {
   decodedUrl: text("decoded_url").notNull(),
   redirectUrl: text("redirect_url"),
   title: text("title"),
+  type: text("type").notNull().default("scanned"),
   isPublic: boolean("is_public").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
