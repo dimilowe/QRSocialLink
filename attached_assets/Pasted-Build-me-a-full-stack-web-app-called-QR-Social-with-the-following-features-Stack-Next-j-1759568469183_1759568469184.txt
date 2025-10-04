@@ -1,0 +1,69 @@
+Build me a full-stack web app called **QR Social** with the following features:
+
+**Stack:**
+- Next.js (frontend, TypeScript, Tailwind for styling)
+- Node.js/Express (API layer)
+- Supabase (auth + database + file storage)
+- Stripe (for freemium → Pro subscription handling)
+
+**Core Features (MVP):**
+
+1. **Authentication & Profiles**
+   - Email/password sign-up & login (via Supabase).
+   - Each user has a profile with:
+     - Username, avatar.
+     - Scan history.
+     - Followers/following.
+
+2. **QR Scanning**
+   - Scan with camera (using a QR scanning library like `jsqr` or `html5-qrcode`).
+   - Upload an image/screenshot → detect and decode QR → return URL.
+   - After scan → auto-redirect to the decoded link.
+   - Save scan to user’s profile history.
+
+3. **Social Feed**
+   - Public feed showing recent scans from users.
+   - Each feed item shows:
+     - User who scanned.
+     - Thumbnail of the QR image.
+     - Decoded link preview.
+   - Users can like/rescan (tap → open the link themselves).
+   - Basic comments.
+
+4. **Self-Scan (Tap-to-Rescan)**
+   - Any QR shown in feed is tappable.
+   - Tapping opens the same decoded link as if the user scanned it.
+   - Option to “rescan + repost” (appears in their own feed).
+
+5. **Freemium / Pro Subscription**
+   - Free tier: unlimited scans, limited history (last 10 scans only), 1 QR drop/month.
+   - Pro tier ($15/mo via Stripe):
+     - Unlimited history.
+     - Dynamic QRs (creator can update target link).
+     - Analytics (scan counts, geo, device).
+     - Branded QR skins (upload logo/art overlay).
+
+6. **Database Schema (Supabase)**
+   - Users: id, email, username, avatar_url.
+   - Scans: id, user_id, qr_image_url, decoded_url, timestamp.
+   - Followers: follower_id, followed_id.
+   - Subscriptions: user_id, plan (free/pro), stripe_customer_id.
+   - QR Drops: id, creator_id, qr_image_url, decoded_url, active_until, scan_count.
+
+7. **UI**
+   - Feed (like Venmo/TikTok style but for scans).
+   - Profile page (shows scan history + QR drops).
+   - “Scan” button floating CTA (camera or upload).
+   - Subscription upgrade modal (freemium → Pro).
+
+8. **Stretch Goals (later)**
+   - Time-locked QR drops.
+   - Limited scans (first 500 only).
+   - Sponsored QR slots in feed.
+   - Push notifications for screenshot detection.
+
+**Output:**
+- Working Next.js + Supabase app scaffold.
+- Basic UI for feed, scan, and profile.
+- Stripe integration stubs for Pro plan.
+- Comments in code to mark where to extend (analytics, dynamic QRs, branded skins).
