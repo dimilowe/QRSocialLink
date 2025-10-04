@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import jsQR from "jsqr";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { X, Upload, CheckCircle2, ExternalLink } from "lucide-react";
@@ -61,46 +60,18 @@ export function QrScanner({ onScanSuccess, onClose }: QrScannerProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        
-        const maxDimension = 800;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = (height / width) * maxDimension;
-            width = maxDimension;
-          } else {
-            width = (width / height) * maxDimension;
-            height = maxDimension;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          
-          if (code) {
-            setScanResult(code.data);
-            stopScanning();
-          } else {
-            setError("No QR code found in image");
-          }
-        }
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    stopScanning();
+    setError(null);
+    
+    try {
+      const html5QrCode = new Html5Qrcode("qr-reader");
+      const decodedText = await html5QrCode.scanFile(file, false);
+      
+      setScanResult(decodedText);
+    } catch (err: any) {
+      setError("No QR code found in image");
+      startScanning();
+    }
   };
 
   const handleOpenLink = () => {
