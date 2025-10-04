@@ -37,7 +37,7 @@ export interface IStorage {
   
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: string): Promise<Scan | undefined>;
-  getUserScans(userId: string): Promise<Scan[]>;
+  getUserScans(userId: string, limit?: number): Promise<Scan[]>;
   getFeed(currentUserId?: string, limit?: number): Promise<ScanWithUser[]>;
   
   followUser(followerId: string, followedId: string): Promise<Follower>;
@@ -126,12 +126,18 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getUserScans(userId: string): Promise<Scan[]> {
-    return await db
+  async getUserScans(userId: string, limit?: number): Promise<Scan[]> {
+    const query = db
       .select()
       .from(scans)
       .where(eq(scans.userId, userId))
       .orderBy(desc(scans.createdAt));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    
+    return await query;
   }
 
   async getFeed(currentUserId?: string, limit: number = 50): Promise<ScanWithUser[]> {

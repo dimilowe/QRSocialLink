@@ -8,7 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-09-30.clover",
+  apiVersion: "2024-11-20.acacia",
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -54,7 +54,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users/:id/scans", async (req, res) => {
     try {
-      const scans = await storage.getUserScans(req.params.id);
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const limit = user.plan === "free" ? 10 : undefined;
+      const scans = await storage.getUserScans(req.params.id, limit);
       res.json(scans);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
