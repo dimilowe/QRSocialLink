@@ -1,26 +1,54 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sparkles, AlertCircle } from "lucide-react";
+import { insertScanSchema } from "@shared/schema";
+
+const createQRFormSchema = insertScanSchema
+  .pick({ decodedUrl: true, title: true })
+  .extend({
+    decodedUrl: z.string().min(1, "URL is required"),
+    title: z.string().optional(),
+  });
+
+type CreateQRFormData = z.infer<typeof createQRFormSchema>;
 
 export default function CreateQRPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
-  const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const form = useForm<CreateQRFormData>({
+    resolver: zodResolver(createQRFormSchema),
+    defaultValues: {
+      decodedUrl: "",
+      title: "",
+    },
+  });
+
+  const url = form.watch("decodedUrl");
 
   useEffect(() => {
     if (!url) {
@@ -53,15 +81,15 @@ export default function CreateQRPage() {
   }, [url, foregroundColor, backgroundColor]);
 
   const createQRMutation = useMutation({
-    mutationFn: async () => {
-      if (!qrImageUrl || !url) {
-        throw new Error("Please enter a valid URL");
+    mutationFn: async (data: CreateQRFormData) => {
+      if (!qrImageUrl) {
+        throw new Error("QR code generation failed");
       }
 
       const response = await apiRequest("POST", "/api/scans", {
-        decodedUrl: url,
+        decodedUrl: data.decodedUrl,
         qrImageUrl,
-        title: title || undefined,
+        title: data.title || undefined,
         type: "created",
         isPublic: true,
       });
@@ -85,7 +113,7 @@ export default function CreateQRPage() {
     },
   });
 
-  const handleCreate = () => {
+  const onSubmit = (data: CreateQRFormData) => {
     if (!user) {
       toast({
         title: "Login required",
@@ -94,7 +122,7 @@ export default function CreateQRPage() {
       });
       return;
     }
-    createQRMutation.mutate();
+    createQRMutation.mutate(data);
   };
 
   const isValidUrl = (str: string) => {
@@ -123,78 +151,94 @@ export default function CreateQRPage() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <Card className="p-6 space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="url">Destination URL *</Label>
-                <Input
-                  id="url"
-                  type="text"
-                  placeholder="https://example.com or example.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  data-testid="input-url"
-                />
-                {url && !isValidUrl(url) && (
-                  <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    Please enter a valid URL
-                  </p>
-                )}
-              </div>
+          <Card className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="decodedUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Destination URL *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="https://example.com or example.com"
+                            data-testid="input-url"
+                            {...field}
+                          />
+                        </FormControl>
+                        {field.value && !isValidUrl(field.value) && (
+                          <p className="text-xs text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            Please enter a valid URL
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="space-y-2">
-                <Label htmlFor="title">Title (optional)</Label>
-                <Input
-                  id="title"
-                  type="text"
-                  placeholder="My awesome link"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  data-testid="input-title"
-                />
-              </div>
+                  <FormField
+                    control={form.control}
+                    name="title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Title (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="My awesome link"
+                            data-testid="input-title"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="foreground">Foreground</Label>
-                  <div className="flex gap-2">
-                    <input
-                      id="foreground"
-                      type="color"
-                      value={foregroundColor}
-                      onChange={(e) => setForegroundColor(e.target.value)}
-                      className="h-10 w-full rounded-md border cursor-pointer"
-                      data-testid="input-foreground-color"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <FormLabel htmlFor="foreground">Foreground</FormLabel>
+                      <div className="flex gap-2">
+                        <input
+                          id="foreground"
+                          type="color"
+                          value={foregroundColor}
+                          onChange={(e) => setForegroundColor(e.target.value)}
+                          className="h-10 w-full rounded-md border cursor-pointer"
+                          data-testid="input-foreground-color"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <FormLabel htmlFor="background">Background</FormLabel>
+                      <div className="flex gap-2">
+                        <input
+                          id="background"
+                          type="color"
+                          value={backgroundColor}
+                          onChange={(e) => setBackgroundColor(e.target.value)}
+                          className="h-10 w-full rounded-md border cursor-pointer"
+                          data-testid="input-background-color"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="background">Background</Label>
-                  <div className="flex gap-2">
-                    <input
-                      id="background"
-                      type="color"
-                      value={backgroundColor}
-                      onChange={(e) => setBackgroundColor(e.target.value)}
-                      className="h-10 w-full rounded-md border cursor-pointer"
-                      data-testid="input-background-color"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              className="w-full h-12"
-              onClick={handleCreate}
-              disabled={!isValidUrl(url) || !qrImageUrl || createQRMutation.isPending}
-              data-testid="button-create-qr"
-            >
-              <Sparkles className="h-5 w-5 mr-2" />
-              {createQRMutation.isPending ? "Creating..." : "Create & Post to Feed"}
-            </Button>
+                <Button
+                  type="submit"
+                  className="w-full h-12"
+                  disabled={!isValidUrl(url) || !qrImageUrl || createQRMutation.isPending}
+                  data-testid="button-create-qr"
+                >
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  {createQRMutation.isPending ? "Creating..." : "Create & Post to Feed"}
+                </Button>
+              </form>
+            </Form>
           </Card>
 
           <Card className="p-6">
@@ -212,11 +256,11 @@ export default function CreateQRPage() {
                     />
                   </div>
                   
-                  {title && (
+                  {form.watch("title") && (
                     <div>
                       <p className="text-sm text-muted-foreground">Title</p>
                       <p className="font-medium" data-testid="text-title-preview">
-                        {title}
+                        {form.watch("title")}
                       </p>
                     </div>
                   )}
@@ -242,7 +286,7 @@ export default function CreateQRPage() {
         {!user && (
           <Card className="p-4 bg-muted/50">
             <p className="text-sm text-muted-foreground text-center">
-              💡 Log in to save and share your QR codes to the feed
+              Log in to save and share your QR codes to the feed
             </p>
           </Card>
         )}

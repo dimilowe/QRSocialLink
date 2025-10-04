@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Heart, MessageCircle, ExternalLink, UserPlus, UserCheck, Edit } from "lucide-react";
+import { Heart, MessageCircle, ExternalLink, UserPlus, UserCheck, Edit, Sparkles } from "lucide-react";
 import { ScanWithUser } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -114,9 +114,17 @@ export function ScanCard({
       </div>
 
       <div className="space-y-2">
-        {scan.title && (
-          <p className="font-medium" data-testid="text-scan-title">{scan.title}</p>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {scan.title && (
+            <p className="font-medium" data-testid="text-scan-title">{scan.title}</p>
+          )}
+          {scan.type === "created" && (
+            <Badge variant="secondary" className="gap-1" data-testid="badge-created">
+              <Sparkles className="h-3 w-3" />
+              Created
+            </Badge>
+          )}
+        </div>
         
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-1 min-w-0">
