@@ -131,6 +131,43 @@ To enable automatic subscription management:
    - `invoice.payment_failed` - Logs payment failures
 4. Copy the webhook signing secret to `STRIPE_WEBHOOK_SECRET` environment variable
 
+## User Preferences
+
+### Database Configuration
+**Always use Neon PostgreSQL** for future builds with this proven configuration:
+
+```typescript
+// db/index.ts
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema";
+
+neonConfig.webSocketConstructor = ws;
+
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to provision a database?",
+  );
+}
+
+export const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+export const db = drizzle({ client: pool, schema });
+```
+
+**Key Configuration Points:**
+- Use `@neondatabase/serverless` package (Pool, neonConfig)
+- Set `neonConfig.webSocketConstructor = ws` before pool initialization
+- Configure SSL with `rejectUnauthorized: false` to avoid certificate errors
+- Use `drizzle-orm/neon-serverless` adapter
+
+This configuration has been battle-tested and resolves SSL certificate issues that can occur with other PostgreSQL setups.
+
 ## Known Limitations / Future Enhancements
 - QR Drops feature UI created but backend not fully implemented
 - Analytics dashboard not yet built
