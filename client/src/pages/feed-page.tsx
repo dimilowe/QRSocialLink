@@ -95,7 +95,11 @@ export default function FeedPage() {
   const handleScanSuccess = async (decodedUrl: string) => {
     setShowScanner(false);
     
-    window.open(decodedUrl, "_blank");
+    let urlToOpen = decodedUrl;
+    if (!decodedUrl.match(/^https?:\/\//i)) {
+      urlToOpen = `https://${decodedUrl}`;
+    }
+    window.open(urlToOpen, "_blank");
 
     if (user) {
       const QRCode = (await import("qrcode")).default;
