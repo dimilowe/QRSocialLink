@@ -60,18 +60,48 @@ export default function CreateQRPage() {
       setIsGenerating(true);
       try {
         const QRCode = (await import("qrcode")).default;
-        const dataUrl = await QRCode.toDataURL(url, {
+        
+        const qrDataUrl = await QRCode.toDataURL(url, {
           color: {
             dark: foregroundColor,
             light: backgroundColor,
           },
           width: 400,
-          margin: 2,
+          margin: 1,
         });
-        setQrImageUrl(dataUrl);
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas not supported");
+
+        const borderSize = 60;
+        const qrSize = 400;
+        canvas.width = qrSize + borderSize * 2;
+        canvas.height = qrSize + borderSize * 2;
+
+        const brandColor = "#9333EA";
+        ctx.fillStyle = brandColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = "bold 24px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("qrsocial.com", canvas.width / 2, 35);
+
+          ctx.font = "16px Inter, sans-serif";
+          ctx.fillText("long-press to open", canvas.width / 2, canvas.height - 25);
+
+          const brandedDataUrl = canvas.toDataURL("image/png");
+          setQrImageUrl(brandedDataUrl);
+          setIsGenerating(false);
+        };
+        img.src = qrDataUrl;
       } catch (err) {
         console.error("QR generation error:", err);
-      } finally {
         setIsGenerating(false);
       }
     };
