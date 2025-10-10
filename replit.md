@@ -20,12 +20,20 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Session-based authentication
 - Protected routes
 
-### QR Code Scanning
+### QR Code Scanning & Creation
 - Camera-based QR scanning using html5-qrcode
 - Image upload QR detection with jsqr
 - Automatic redirect to decoded URLs
 - QR code generation and storage
 - Scan history per user
+- **Branded QR Code Creation**: Users can create custom QR codes with:
+  - Purple branded borders (matching QR Social's primary color #9333EA)
+  - "qrsocial.com" branding text at top
+  - "long-press to open" instructions at bottom
+  - Customizable QR colors (foreground/background)
+  - Optional title field
+  - Real-time preview
+  - Auto-post to social feed
 
 ### Social Feed
 - Public feed showing recent scans from all users
@@ -65,7 +73,8 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 
 ### Tables
 - **users**: id, email, username, password, avatarUrl, plan, stripeCustomerId, stripeSubscriptionId
-- **scans**: id, userId, qrImageUrl, decodedUrl, title, isPublic
+- **scans**: id, userId, qrImageUrl, decodedUrl, title, type, redirectUrl, isPublic
+  - `type` field: "scanned" (default) or "created" to distinguish scan vs creation
 - **followers**: id, followerId, followedId
 - **likes**: id, userId, scanId
 - **comments**: id, userId, scanId, content
@@ -119,6 +128,14 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Database schema deployed to Neon
 - Theme toggle system implemented
 - Responsive design with mobile navigation
+- **QR Code Creator feature launched** (Phase 3):
+  - New /create route with dedicated creator page
+  - Canvas-based branded QR generation with purple borders
+  - QR Social branding ("qrsocial.com" + "long-press to open")
+  - Color customization (foreground/background)
+  - Real-time preview with title support
+  - Created QRs auto-post to feed with "Created" badge
+  - Bottom navigation updated (Home, Create, Activity, Profile)
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
@@ -171,8 +188,8 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 ## Known Limitations / Future Enhancements
 - QR Drops feature UI created but backend not fully implemented
 - Analytics dashboard not yet built
-- Branded QR skins not implemented
 - No real-time feed updates (polling only)
 - Avatar upload not yet implemented (using default avatars)
-- Dynamic QR URL updates not implemented
 - Rescan/repost functionality not implemented
+- Download QR code option not yet implemented
+- QR code analytics (scan count tracking) not implemented
