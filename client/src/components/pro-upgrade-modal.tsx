@@ -66,7 +66,7 @@ const plans = [
   },
   {
     id: "enterprise",
-    name: "Enterprise",
+    name: "Unlimited",
     price: 99,
     icon: Building2,
     description: "For businesses & teams",
@@ -78,7 +78,7 @@ const plans = [
       "Team collaboration",
       "Dedicated support",
     ],
-    cta: "Get Enterprise",
+    cta: "Get Unlimited",
   },
 ];
 

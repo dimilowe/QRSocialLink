@@ -73,7 +73,7 @@ QR Social offers a freemium model with 4 pricing tiers:
 - Priority support
 - All Starter features
 
-**Enterprise** - $99/month:
+**Unlimited** - $99/month:
 - Unlimited QR codes
 - Custom branding
 - Full analytics dashboard
@@ -167,7 +167,7 @@ Implementation:
   - Bottom navigation updated (Home, Create, Activity, Profile)
   - Desktop navigation in top header (Feed, Create, Activity)
 - **4-Tier Subscription Pricing Implemented** (November 2025):
-  - Replaced Free/Pro ($15) with Free/Starter ($10)/Pro ($30)/Enterprise ($99)
+  - Replaced Free/Pro ($15) with Free/Starter ($10)/Pro ($30)/Unlimited ($99)
   - Added PLAN_TIERS and PLAN_LIMITS to shared/schema.ts
   - Updated backend to handle plan changes (upgrades/downgrades)
   - Subscription update API supports plan changes with proration

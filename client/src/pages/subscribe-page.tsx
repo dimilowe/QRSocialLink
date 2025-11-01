@@ -23,7 +23,7 @@ const PLAN_CONFIG = {
     color: "from-[hsl(var(--pro-badge-from))] to-[hsl(var(--pro-badge-to))]",
   },
   enterprise: {
-    name: "Enterprise",
+    name: "Unlimited",
     price: 99,
     icon: Building2,
     color: "from-purple-600 to-pink-600",
