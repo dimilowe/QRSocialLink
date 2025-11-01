@@ -130,6 +130,11 @@ export default function DashboardPage() {
             ctx.fillText(bottomText, canvas.width / 2, canvas.height - 25);
           }
 
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.font = "10px Inter, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
+
           const brandedDataUrl = canvas.toDataURL("image/png");
           setQrImageUrl(brandedDataUrl);
           setIsGenerating(false);

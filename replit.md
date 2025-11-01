@@ -30,6 +30,7 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
   - Purple branded borders (matching QR Social's primary color #9333EA)
   - "qrsocial.com" branding text at top
   - "long-press to open" instructions at bottom
+  - "Made with QR Social" watermark in bottom right corner (subtle self-advertising)
   - Customizable QR colors (foreground/background)
   - Optional title field
   - Real-time preview
@@ -184,6 +185,7 @@ Implementation:
   - Download button in dashboard edit modal preview section
   - Downloads as PNG files with descriptive filenames (includes title or ID)
   - Uses anchor element with download attribute for cross-browser compatibility
+  - All downloaded QR codes include "Made with QR Social" watermark for self-promotion
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
