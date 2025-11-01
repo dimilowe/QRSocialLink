@@ -344,24 +344,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).send({ error: { message: "Invalid plan tier" } });
     }
 
-    if (user.stripeSubscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(
-        user.stripeSubscriptionId
-      );
-
-      const invoice: any = await stripe.invoices.retrieve(
-        subscription.latest_invoice as string,
-        { expand: ['payment_intent'] }
-      );
-
-      res.send({
-        subscriptionId: subscription.id,
-        clientSecret: invoice.payment_intent?.client_secret,
-      });
-
-      return;
-    }
-
     if (!user.email) {
       throw new Error("No user email on file");
     }
@@ -378,6 +360,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const planConfig = PLAN_PRICES[planTier as keyof typeof PLAN_PRICES];
+
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(
+          user.stripeSubscriptionId
+        );
+
+        const currentPlanTier = subscription.metadata?.planTier;
+
+        if (currentPlanTier === planTier) {
+          return res.send({
+            subscriptionId: subscription.id,
+            success: true,
+            message: `You already have the ${planConfig.name} plan`,
+          });
+        }
+
+        const newPrice = await stripe.prices.create({
+          currency: "usd",
+          unit_amount: planConfig.amount,
+          recurring: {
+            interval: "month",
+          },
+          product_data: {
+            name: planConfig.name,
+          } as any,
+        });
+
+        const updatedSubscription = await stripe.subscriptions.update(
+          user.stripeSubscriptionId,
+          {
+            items: [{
+              id: subscription.items.data[0].id,
+              price: newPrice.id,
+            }],
+            metadata: {
+              planTier: planTier,
+            },
+            proration_behavior: "create_prorations",
+            expand: ["latest_invoice.payment_intent"],
+          }
+        );
+
+        const invoice = updatedSubscription.latest_invoice as any;
+        const paymentIntent = invoice?.payment_intent as any;
+
+        if (!paymentIntent || paymentIntent.status === "succeeded") {
+          await storage.updateUserPlan(user.id, planTier as PlanTier);
+          
+          return res.send({
+            subscriptionId: updatedSubscription.id,
+            success: true,
+            message: "Subscription updated successfully",
+          });
+        }
+
+        return res.send({
+          subscriptionId: updatedSubscription.id,
+          clientSecret: paymentIntent?.client_secret,
+        });
+      }
 
       const price = await stripe.prices.create({
         currency: "usd",
