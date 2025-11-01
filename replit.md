@@ -121,6 +121,7 @@ Implementation:
 - GET `/api/feed` - Get public feed
 - POST `/api/scans` - Create new scan
 - GET `/api/users/:id/scans` - Get user's scans
+- PATCH `/api/scans/:id` - Update QR code (Starter+ plan required)
 
 ### Social
 - POST `/api/users/:id/follow` - Follow user
@@ -177,6 +178,12 @@ Implementation:
   - Pricing modal shows all 4 tiers in responsive grid
   - Subscribe page handles plan parameter and all flow types
   - Webhook stores and reads planTier from subscription metadata
+- **QR Code Download Functionality** (November 2025):
+  - Download button on QR creator page (/create) below preview
+  - Download button on each dashboard QR card alongside Edit button
+  - Download button in dashboard edit modal preview section
+  - Downloads as PNG files with descriptive filenames (includes title or ID)
+  - Uses anchor element with download attribute for cross-browser compatibility
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
@@ -232,5 +239,4 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 - No real-time feed updates (polling only)
 - Avatar upload not yet implemented (using default avatars)
 - Rescan/repost functionality not implemented
-- Download QR code option not yet implemented
 - QR code analytics (scan count tracking) not implemented
