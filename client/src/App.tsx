@@ -11,10 +11,11 @@ import FeedPage from "@/pages/feed-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
 import CreateQRPage from "@/pages/create-qr-page";
+import DashboardPage from "@/pages/dashboard-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
+function ProtectedRoute({ component: Component }: { component: () => JSX.Element }): JSX.Element {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -53,6 +54,7 @@ function Router() {
         </Route>
         <Route path="/" component={() => <ProtectedRoute component={FeedPage} />} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
+        <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route component={NotFound} />

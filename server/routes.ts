@@ -8,7 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2024-11-20.acacia" as any,
 });
 
 const PLAN_PRICES = {
@@ -49,6 +49,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const scan = await storage.createScan(validatedData);
       res.json(scan);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/scans/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const scan = await storage.getScan(req.params.id);
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      if (scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to edit this scan" });
+      }
+
+      const userPlan = req.user.plan as PlanTier;
+      if (!PLAN_LIMITS[userPlan]?.canEdit) {
+        return res.status(403).json({ message: "Upgrade to Starter or higher to edit QR codes" });
+      }
+
+      const updateSchema = insertScanSchema.partial().omit({ userId: true, type: true, isPublic: true });
+      const validatedData = updateSchema.parse(req.body);
+      
+      const updatedScan = await storage.updateScan(req.params.id, validatedData);
+      
+      res.json(updatedScan);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
