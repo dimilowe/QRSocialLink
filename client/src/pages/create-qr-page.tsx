@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, Download } from "lucide-react";
 import { insertScanSchema } from "@shared/schema";
 
 const createQRFormSchema = insertScanSchema
@@ -184,6 +184,15 @@ export default function CreateQRPage() {
     } catch {
       return false;
     }
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrImageUrl) return;
+    
+    const link = document.createElement("a");
+    link.download = `qr-code-${form.watch("title") || "download"}.png`;
+    link.href = qrImageUrl;
+    link.click();
   };
 
   return (
@@ -362,6 +371,17 @@ export default function CreateQRPage() {
                       data-testid="img-qr-preview"
                     />
                   </div>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleDownloadQR}
+                    data-testid="button-download-qr"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download QR Code
+                  </Button>
                   
                   {form.watch("title") && (
                     <div>

@@ -12,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LayoutDashboard, Edit, AlertCircle, Sparkles } from "lucide-react";
+import { LayoutDashboard, Edit, AlertCircle, Sparkles, Download } from "lucide-react";
 import type { Scan } from "@shared/schema";
 import { useEffect } from "react";
 
@@ -205,6 +205,24 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDownloadQR = (scan: Scan) => {
+    if (!scan.qrImageUrl) return;
+    
+    const link = document.createElement("a");
+    link.download = `qr-code-${scan.title || scan.id}.png`;
+    link.href = scan.qrImageUrl;
+    link.click();
+  };
+
+  const handleDownloadPreviewQR = () => {
+    if (!qrImageUrl || !editingScan) return;
+    
+    const link = document.createElement("a");
+    link.download = `qr-code-${form.watch("title") || editingScan.id}.png`;
+    link.href = qrImageUrl;
+    link.click();
+  };
+
   const createdScans = scans || [];
   const planLimit = user?.plan === "free" ? 1 : user?.plan === "starter" ? 20 : user?.plan === "pro" ? 50 : -1;
   const canCreateMore = planLimit === -1 || createdScans.length < planLimit;
@@ -272,15 +290,26 @@ export default function DashboardPage() {
                     {scan.decodedUrl}
                   </p>
                 </div>
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={() => setEditingScan(scan)}
-                  data-testid={`button-edit-${scan.id}`}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit QR Code
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => handleDownloadQR(scan)}
+                    data-testid={`button-download-${scan.id}`}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => setEditingScan(scan)}
+                    data-testid={`button-edit-${scan.id}`}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
@@ -447,14 +476,26 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">Preview</h3>
               {qrImageUrl ? (
-                <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square">
-                  <img
-                    src={qrImageUrl}
-                    alt="QR Code Preview"
-                    className="max-w-full max-h-full"
-                    data-testid="img-edit-qr-preview"
-                  />
-                </div>
+                <>
+                  <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square">
+                    <img
+                      src={qrImageUrl}
+                      alt="QR Code Preview"
+                      className="max-w-full max-h-full"
+                      data-testid="img-edit-qr-preview"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleDownloadPreviewQR}
+                    data-testid="button-download-preview-qr"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download QR Code
+                  </Button>
+                </>
               ) : (
                 <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square">
                   <p className="text-muted-foreground text-center">
