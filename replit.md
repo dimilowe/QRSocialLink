@@ -50,14 +50,43 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Pro tier: unlimited history
 - Logout functionality
 
-### Freemium / Pro Subscription
-- Free tier: unlimited scans, limited history (10 scans), public feed access
-- Pro tier: $15/month via Stripe
-  - Unlimited scan history
-  - Future: Dynamic QRs, analytics, branded skins, unlimited QR drops
-- Pro upgrade modal with feature comparison
-- Stripe checkout integration
-- Subscription management
+### 4-Tier Subscription Model
+QR Social offers a freemium model with 4 pricing tiers:
+
+**Free** - $0/month:
+- 1 static QR code
+- Public feed access
+- Like & comment features
+- Follow users
+
+**Starter** - $10/month:
+- 20 editable QR codes
+- Edit QR destinations anytime
+- Basic analytics
+- Scan tracking
+- All Free features
+
+**Pro** - $30/month (Most Popular):
+- 50 editable QR codes
+- Advanced analytics
+- Custom QR colors
+- Priority support
+- All Starter features
+
+**Enterprise** - $99/month:
+- Unlimited QR codes
+- Custom branding
+- Full analytics dashboard
+- Team collaboration
+- Dedicated support
+- All Pro features
+
+Implementation:
+- Multi-tier upgrade modal with plan comparison
+- Stripe checkout integration with plan parameter
+- Dynamic subscription updates (upgrade/downgrade)
+- Webhook-based plan management
+- Backend enforcement of tier limits
 
 ### Design System
 - Dark mode by default with light mode toggle
@@ -116,14 +145,14 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key
 - `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret (for webhook signature verification)
 
-## Recent Changes (October 2025)
+## Recent Changes (November 2025)
 - Initial MVP implementation completed
 - All core features functional
 - Stripe subscription flow integrated with webhook handling
 - Webhook endpoint processes subscription events (invoice.paid, subscription.updated, subscription.deleted)
 - Automatic plan updates based on subscription status
-- Backend enforcement of free tier 10-scan limit
-- Fixed Stripe API version and free tier enforcement
+- Backend enforcement of tier limits
+- Fixed Stripe API version and tier enforcement
 - **Migrated from Supabase to Neon PostgreSQL** - Resolved SSL certificate issues by switching to Neon database with proven neon-serverless driver configuration
 - Database schema deployed to Neon
 - Theme toggle system implemented
@@ -136,6 +165,18 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
   - Real-time preview with title support
   - Created QRs auto-post to feed with "Created" badge
   - Bottom navigation updated (Home, Create, Activity, Profile)
+  - Desktop navigation in top header (Feed, Create, Activity)
+- **4-Tier Subscription Pricing Implemented** (November 2025):
+  - Replaced Free/Pro ($15) with Free/Starter ($10)/Pro ($30)/Enterprise ($99)
+  - Added PLAN_TIERS and PLAN_LIMITS to shared/schema.ts
+  - Updated backend to handle plan changes (upgrades/downgrades)
+  - Subscription update API supports plan changes with proration
+  - Same-plan selections return immediate success
+  - Downgrades handled via credit invoices (no payment required)
+  - Upgrades require payment confirmation
+  - Pricing modal shows all 4 tiers in responsive grid
+  - Subscribe page handles plan parameter and all flow types
+  - Webhook stores and reads planTier from subscription metadata
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
