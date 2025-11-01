@@ -3,6 +3,42 @@ import { pgTable, text, varchar, timestamp, boolean, integer, uuid } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const PLAN_TIERS = {
+  FREE: "free",
+  STARTER: "starter",
+  PRO: "pro",
+  ENTERPRISE: "enterprise",
+} as const;
+
+export type PlanTier = typeof PLAN_TIERS[keyof typeof PLAN_TIERS];
+
+export const PLAN_LIMITS = {
+  free: {
+    maxQRs: 1,
+    canEdit: false,
+    hasAnalytics: false,
+    hasBranding: false,
+  },
+  starter: {
+    maxQRs: 20,
+    canEdit: true,
+    hasAnalytics: true,
+    hasBranding: false,
+  },
+  pro: {
+    maxQRs: 50,
+    canEdit: true,
+    hasAnalytics: true,
+    hasBranding: false,
+  },
+  enterprise: {
+    maxQRs: -1, // unlimited
+    canEdit: true,
+    hasAnalytics: true,
+    hasBranding: true,
+  },
+} as const;
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),

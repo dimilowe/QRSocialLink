@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
-import { insertScanSchema, insertCommentSchema } from "@shared/schema";
+import { insertScanSchema, insertCommentSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
@@ -10,6 +10,21 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-11-20.acacia",
 });
+
+const PLAN_PRICES = {
+  starter: {
+    amount: 1000, // $10
+    name: "QR Social Starter",
+  },
+  pro: {
+    amount: 3000, // $30
+    name: "QR Social Pro",
+  },
+  enterprise: {
+    amount: 9900, // $99
+    name: "QR Social Enterprise",
+  },
+} as const;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feed", async (req, res) => {
@@ -54,8 +69,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to edit this scan" });
       }
 
-      if (req.user.plan !== "pro") {
-        return res.status(403).json({ message: "Pro plan required for dynamic QR updates" });
+      const userPlan = req.user.plan as PlanTier;
+      if (!PLAN_LIMITS[userPlan]?.canEdit) {
+        return res.status(403).json({ message: "Paid plan required for dynamic QR updates" });
       }
 
       const { redirectUrl } = req.body;
@@ -102,14 +118,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const profileUserId = req.params.id;
       const isOwnProfile = req.isAuthenticated() && req.user.id === profileUserId;
-      const currentUserPlan = req.user?.plan || "free";
+      const currentUserPlan = (req.user?.plan || "free") as PlanTier;
       
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = parseInt(req.query.pageSize as string) || 20;
       
       const stats = await storage.getUserStats(profileUserId);
+      const planLimits = PLAN_LIMITS[currentUserPlan];
       
-      if (isOwnProfile && currentUserPlan === "pro") {
+      if (isOwnProfile && (planLimits.maxQRs === -1 || planLimits.maxQRs > 10)) {
         const offset = (page - 1) * pageSize;
         const scans = await storage.getUserScansPaginated(profileUserId, pageSize, offset);
         res.json({ 
@@ -120,13 +137,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pageSize
         });
       } else {
-        const scans = await storage.getUserScans(profileUserId, 10);
+        const limit = isOwnProfile ? planLimits.maxQRs : 10;
+        const scans = await storage.getUserScans(profileUserId, limit);
         res.json({ 
           scans, 
-          hasMore: isOwnProfile && stats.scansCount > 10, 
+          hasMore: isOwnProfile && stats.scansCount > limit, 
           total: stats.scansCount,
           page: 1,
-          pageSize: 10
+          pageSize: limit
         });
       }
     } catch (error: any) {
@@ -254,9 +272,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const customerId = invoice.customer as string;
           
           const users = await storage.getUserByStripeCustomerId(customerId);
-          if (users) {
-            await storage.updateUserPlan(users.id, "pro");
-            console.log(`User ${users.id} upgraded to Pro (invoice paid)`);
+          if (users && invoice.subscription) {
+            const subscription = await stripe.subscriptions.retrieve(
+              invoice.subscription as string
+            );
+            const planTier = (subscription.metadata?.planTier || "pro") as PlanTier;
+            await storage.updateUserPlan(users.id, planTier);
+            console.log(`User ${users.id} upgraded to ${planTier} (invoice paid)`);
           }
           break;
         }
@@ -268,7 +290,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const users = await storage.getUserByStripeCustomerId(customerId);
           if (users) {
             const activePlanStatuses = ["active", "trialing", "past_due"];
-            const plan = activePlanStatuses.includes(subscription.status) ? "pro" : "free";
+            const planTier = (subscription.metadata?.planTier || "pro") as PlanTier;
+            const plan = activePlanStatuses.includes(subscription.status) ? planTier : "free";
             await storage.updateUserPlan(users.id, plan);
             console.log(`User ${users.id} subscription updated: ${plan} (status: ${subscription.status})`);
           }
@@ -315,6 +338,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     let user = req.user;
+    const { planTier } = req.body;
+
+    if (!planTier || !["starter", "pro", "enterprise"].includes(planTier)) {
+      return res.status(400).send({ error: { message: "Invalid plan tier" } });
+    }
 
     if (user.stripeSubscriptionId) {
       const subscription = await stripe.subscriptions.retrieve(
@@ -339,31 +367,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: user.username,
-      });
+      let customerId = user.stripeCustomerId;
+      
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.username,
+        });
+        customerId = customer.id;
+      }
+
+      const planConfig = PLAN_PRICES[planTier as keyof typeof PLAN_PRICES];
 
       const price = await stripe.prices.create({
         currency: "usd",
-        unit_amount: 1500,
+        unit_amount: planConfig.amount,
         recurring: {
           interval: "month",
         },
         product_data: {
-          name: "QR Social Pro",
+          name: planConfig.name,
         } as any,
       });
 
       const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
+        customer: customerId,
         items: [{ price: price.id }],
         payment_behavior: "default_incomplete",
         payment_settings: { save_default_payment_method: "on_subscription" },
         expand: ["latest_invoice.payment_intent"],
+        metadata: {
+          planTier: planTier,
+        },
       });
 
-      await storage.updateUserStripeInfo(user.id, customer.id, subscription.id);
+      await storage.updateUserStripeInfo(user.id, customerId, subscription.id);
 
       const invoice = subscription.latest_invoice as any;
       const paymentIntent = invoice?.payment_intent as any;
