@@ -37,6 +37,10 @@ export default function CreateQRPage() {
   
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
+  const [borderColor, setBorderColor] = useState("#9333EA");
+  const [topText, setTopText] = useState("qrsocial.com");
+  const [bottomText, setBottomText] = useState("long-press to open");
+  const [enableBranding, setEnableBranding] = useState(true);
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -70,6 +74,12 @@ export default function CreateQRPage() {
           margin: 1,
         });
 
+        if (!enableBranding) {
+          setQrImageUrl(qrDataUrl);
+          setIsGenerating(false);
+          return;
+        }
+
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas not supported");
@@ -79,21 +89,26 @@ export default function CreateQRPage() {
         canvas.width = qrSize + borderSize * 2;
         canvas.height = qrSize + borderSize * 2;
 
-        const brandColor = "#9333EA";
-        ctx.fillStyle = brandColor;
+        ctx.fillStyle = borderColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         const img = new Image();
         img.onload = () => {
           ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
 
-          ctx.fillStyle = "#FFFFFF";
-          ctx.font = "bold 24px Inter, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("qrsocial.com", canvas.width / 2, 35);
+          if (topText) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "bold 24px Inter, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(topText, canvas.width / 2, 35);
+          }
 
-          ctx.font = "16px Inter, sans-serif";
-          ctx.fillText("long-press to open", canvas.width / 2, canvas.height - 25);
+          if (bottomText) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = "16px Inter, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(bottomText, canvas.width / 2, canvas.height - 25);
+          }
 
           const brandedDataUrl = canvas.toDataURL("image/png");
           setQrImageUrl(brandedDataUrl);
@@ -108,7 +123,7 @@ export default function CreateQRPage() {
 
     const debounce = setTimeout(generateQR, 300);
     return () => clearTimeout(debounce);
-  }, [url, foregroundColor, backgroundColor]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -256,6 +271,62 @@ export default function CreateQRPage() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="enable-branding"
+                        type="checkbox"
+                        checked={enableBranding}
+                        onChange={(e) => setEnableBranding(e.target.checked)}
+                        className="h-4 w-4 rounded border cursor-pointer"
+                        data-testid="checkbox-enable-branding"
+                      />
+                      <FormLabel htmlFor="enable-branding" className="cursor-pointer mb-0">
+                        Add custom branding
+                      </FormLabel>
+                    </div>
+                  </div>
+
+                  {enableBranding && (
+                    <div className="space-y-4 p-4 border rounded-md bg-muted/30">
+                      <div className="space-y-2">
+                        <FormLabel htmlFor="top-text">Top Text</FormLabel>
+                        <Input
+                          id="top-text"
+                          value={topText}
+                          onChange={(e) => setTopText(e.target.value)}
+                          placeholder="qrsocial.com"
+                          maxLength={30}
+                          data-testid="input-top-text"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <FormLabel htmlFor="bottom-text">Bottom Text</FormLabel>
+                        <Input
+                          id="bottom-text"
+                          value={bottomText}
+                          onChange={(e) => setBottomText(e.target.value)}
+                          placeholder="long-press to open"
+                          maxLength={30}
+                          data-testid="input-bottom-text"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <FormLabel htmlFor="border-color">Border Color</FormLabel>
+                        <input
+                          id="border-color"
+                          type="color"
+                          value={borderColor}
+                          onChange={(e) => setBorderColor(e.target.value)}
+                          className="h-10 w-full rounded-md border cursor-pointer"
+                          data-testid="input-border-color"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <Button

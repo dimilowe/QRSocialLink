@@ -8,7 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-09-30.clover",
 });
 
 const PLAN_PRICES = {
@@ -272,9 +272,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const customerId = invoice.customer as string;
           
           const users = await storage.getUserByStripeCustomerId(customerId);
-          if (users && invoice.subscription) {
+          const invoiceSubscriptionId = (invoice as any).subscription;
+          if (users && invoiceSubscriptionId) {
             const subscription = await stripe.subscriptions.retrieve(
-              invoice.subscription as string
+              invoiceSubscriptionId as string
             );
             const planTier = (subscription.metadata?.planTier || "pro") as PlanTier;
             await storage.updateUserPlan(users.id, planTier);
