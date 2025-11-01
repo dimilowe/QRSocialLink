@@ -60,6 +60,12 @@ export const scans = pgTable("scans", {
   title: text("title"),
   type: text("type").notNull().default("scanned"),
   isPublic: boolean("is_public").notNull().default(true),
+  topText: text("top_text"),
+  bottomText: text("bottom_text"),
+  borderColor: text("border_color"),
+  enableBranding: boolean("enable_branding").default(false),
+  foregroundColor: text("foreground_color"),
+  backgroundColor: text("background_color"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

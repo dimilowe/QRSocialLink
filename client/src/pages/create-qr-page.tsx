@@ -137,6 +137,12 @@ export default function CreateQRPage() {
         title: data.title || undefined,
         type: "created",
         isPublic: true,
+        topText: enableBranding ? topText : null,
+        bottomText: enableBranding ? bottomText : null,
+        borderColor: enableBranding ? borderColor : null,
+        enableBranding,
+        foregroundColor,
+        backgroundColor,
       });
       return response.json();
     },
