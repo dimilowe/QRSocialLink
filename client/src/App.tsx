@@ -63,7 +63,7 @@ function Router() {
         <Route path="/subscribe">
           {() => <ProtectedRoute component={SubscribePage} />}
         </Route>
-        <Route component={NotFound} />
+        <Route>{() => <NotFound />}</Route>
       </Switch>
       {user && <BottomNav />}
     </>
