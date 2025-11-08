@@ -612,6 +612,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/campaigns/:campaignId/analytics/devices", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const events = await storage.getCampaignEvents(req.params.campaignId);
+      const deviceBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const device = event.deviceType || 'unknown';
+        acc[device] = (acc[device] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.json(deviceBreakdown);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/campaigns/:campaignId/analytics/platforms", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const events = await storage.getCampaignEvents(req.params.campaignId);
+      const platformBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const platform = event.platform || 'Direct/Unknown';
+        acc[platform] = (acc[platform] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.json(platformBreakdown);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/campaigns/:campaignId/analytics/timeseries", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const events = await storage.getCampaignEvents(req.params.campaignId);
+      const timeSeriesData = events.reduce((acc: Record<string, number>, event) => {
+        const date = new Date(event.timestamp).toISOString().split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
+        return acc;
+      }, {});
+
+      const sortedData = Object.entries(timeSeriesData)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, scans: count }));
+
+      res.json(sortedData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/campaigns/:campaignId/analytics/os", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const events = await storage.getCampaignEvents(req.params.campaignId);
+      const osBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const os = event.os || 'Unknown';
+        acc[os] = (acc[os] || 0) + 1;
+        return acc;
+      }, {});
+
+      res.json(osBreakdown);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/webhooks/stripe", async (req, res) => {
     const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

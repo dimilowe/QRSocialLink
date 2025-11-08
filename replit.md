@@ -119,8 +119,9 @@ Implementation:
   - Video/image overlays with defined safe areas for QR placement
 - **overlayRenditions**: id, userId, scanId, frameId, status, outputUrl, createdAt, completedAt
   - FFmpeg rendering jobs for QR + frame composites
-- **scanEvents**: id, campaignId, destinationId, scanId, userAgent, ipHash, referrer, country, platform, timestamp
+- **scanEvents**: id, campaignId, destinationId, scanId, frameId, userAgent, ipHash, referrer, country, platform, deviceType, os, osVersion, browser, browserVersion, timestamp
   - Detailed analytics tracking with privacy-friendly IP hashing
+  - Tracks device type (mobile/desktop/tablet), platform source (TikTok, Instagram, YouTube, etc.), OS, and browser
 
 ## API Endpoints
 
@@ -163,6 +164,12 @@ Implementation:
 - DELETE `/api/destinations/:id` - Delete destination
 - GET `/r/:slug` - Dynamic redirect with A/B testing (public)
 - POST `/api/events/conversion` - Record conversion event (public)
+
+### Advanced Analytics
+- GET `/api/campaigns/:campaignId/analytics/devices` - Device type breakdown (mobile, desktop, tablet)
+- GET `/api/campaigns/:campaignId/analytics/platforms` - Platform source breakdown (TikTok, Instagram, YouTube, etc.)
+- GET `/api/campaigns/:campaignId/analytics/timeseries` - Time-series scan data for virality tracking
+- GET `/api/campaigns/:campaignId/analytics/os` - Operating system breakdown (iOS, Android, Windows, macOS)
 
 ## Environment Variables Required
 - `DATABASE_URL` - Neon PostgreSQL connection string
@@ -231,7 +238,16 @@ Implementation:
     - Delete campaigns with confirmation dialog
     - Navigation: Added "Campaigns" to top header and bottom mobile nav
     - Real-time stats updates (impressions, conversions, CTR per variant)
-  - Backend ready for frame overlays and advanced analytics UI
+  - **Enhanced Analytics Tracking** (November 2025):
+    - Device type detection (mobile, desktop, tablet) using UAParser
+    - Platform source detection (TikTok, Instagram, YouTube, Facebook, Twitter, LinkedIn, etc.)
+    - Operating system tracking (iOS, Android, Windows, macOS with version)
+    - Browser tracking (Chrome, Safari, Firefox, etc. with version)
+    - Time-series scan data for virality wave analysis
+    - Privacy-friendly IP hashing for compliance
+    - API endpoints for all analytics dimensions
+    - User-friendly error pages for campaigns without destinations
+  - Backend ready for frame overlays and analytics dashboard UI
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
