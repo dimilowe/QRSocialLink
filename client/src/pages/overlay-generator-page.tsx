@@ -51,6 +51,123 @@ export default function OverlayGeneratorPage() {
     }
   }, [selectedFrame]);
 
+  const scaleOverlayForPlatform = (templateData: any, safeArea: any, platformConfig: any) => {
+    const BASE_WIDTH = 1080;
+    const BASE_HEIGHT = 1920;
+    
+    const scaleX = platformConfig.width / BASE_WIDTH;
+    const scaleY = platformConfig.height / BASE_HEIGHT;
+    
+    const position = templateData.position;
+    const isHorizontal = platformConfig.width > platformConfig.height;
+    
+    let scaledOverlay = { ...templateData.overlay };
+    let scaledQR = { ...safeArea.qr };
+    let scaledCTA = { ...safeArea.cta };
+    
+    if (position === "banner-top") {
+      scaledOverlay.x = 0;
+      scaledOverlay.y = 0;
+      scaledOverlay.width = platformConfig.width;
+      scaledOverlay.height = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
+      
+      scaledQR.x = 40;
+      scaledQR.y = isHorizontal ? 50 : Math.round(safeArea.qr.y * scaleY);
+      scaledQR.size = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
+      
+      scaledCTA.x = scaledQR.x + scaledQR.size + 30;
+      scaledCTA.y = scaledQR.y;
+      scaledCTA.width = platformConfig.width - scaledCTA.x - 40;
+      scaledCTA.height = scaledQR.size;
+    } else if (position === "banner-bottom") {
+      scaledOverlay.x = 0;
+      scaledOverlay.y = isHorizontal ? platformConfig.height - 200 : platformConfig.height - Math.round(templateData.overlay.height * scaleY);
+      scaledOverlay.width = platformConfig.width;
+      scaledOverlay.height = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
+      
+      scaledQR.x = 40;
+      scaledQR.y = scaledOverlay.y + (isHorizontal ? 30 : 40);
+      scaledQR.size = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
+      
+      scaledCTA.x = scaledQR.x + scaledQR.size + 30;
+      scaledCTA.y = scaledQR.y;
+      scaledCTA.width = platformConfig.width - scaledCTA.x - 40;
+      scaledCTA.height = scaledQR.size;
+    } else if (position.startsWith("corner-")) {
+      const overlaySize = isHorizontal ? Math.min(350, platformConfig.height * 0.4) : Math.round(templateData.overlay.width * scaleX);
+      const overlayHeight = isHorizontal ? overlaySize * 1.1 : Math.round(templateData.overlay.height * scaleY);
+      const margin = isHorizontal ? 30 : 40;
+      
+      if (position === "corner-tl") {
+        scaledOverlay.x = margin;
+        scaledOverlay.y = isHorizontal ? margin + 80 : platformConfig.safeZone.top + 30;
+      } else if (position === "corner-tr") {
+        scaledOverlay.x = platformConfig.width - overlaySize - margin;
+        scaledOverlay.y = isHorizontal ? margin + 80 : platformConfig.safeZone.top + 30;
+      } else if (position === "corner-bl") {
+        scaledOverlay.x = margin;
+        scaledOverlay.y = platformConfig.height - overlayHeight - (isHorizontal ? margin + 80 : platformConfig.safeZone.bottom + 30);
+      } else if (position === "corner-br") {
+        scaledOverlay.x = platformConfig.width - overlaySize - margin;
+        scaledOverlay.y = platformConfig.height - overlayHeight - (isHorizontal ? margin + 80 : platformConfig.safeZone.bottom + 30);
+      }
+      
+      scaledOverlay.width = overlaySize;
+      scaledOverlay.height = overlayHeight;
+      
+      const qrSize = overlaySize * 0.65;
+      scaledQR.x = scaledOverlay.x + (overlaySize - qrSize) / 2;
+      scaledQR.y = scaledOverlay.y + 40;
+      scaledQR.size = qrSize;
+      
+      scaledCTA.x = scaledOverlay.x + 20;
+      scaledCTA.y = scaledQR.y + qrSize + 20;
+      scaledCTA.width = overlaySize - 40;
+      scaledCTA.height = 60;
+    } else if (position.startsWith("sidebar-")) {
+      const sidebarWidth = isHorizontal ? 250 : Math.round(templateData.overlay.width * scaleX);
+      
+      if (position === "sidebar-left") {
+        scaledOverlay.x = 0;
+      } else {
+        scaledOverlay.x = platformConfig.width - sidebarWidth;
+      }
+      
+      scaledOverlay.y = isHorizontal ? 100 : platformConfig.safeZone.top;
+      scaledOverlay.width = sidebarWidth;
+      scaledOverlay.height = platformConfig.height - (isHorizontal ? 200 : platformConfig.safeZone.top + platformConfig.safeZone.bottom);
+      
+      const qrSize = sidebarWidth * 0.7;
+      scaledQR.x = scaledOverlay.x + (sidebarWidth - qrSize) / 2;
+      scaledQR.y = scaledOverlay.y + scaledOverlay.height / 2 - qrSize / 2 - 60;
+      scaledQR.size = qrSize;
+      
+      scaledCTA.x = scaledOverlay.x + 20;
+      scaledCTA.y = scaledQR.y + qrSize + 30;
+      scaledCTA.width = sidebarWidth - 40;
+      scaledCTA.height = 80;
+    } else if (position === "center") {
+      const squareSize = isHorizontal ? Math.min(450, platformConfig.height * 0.55) : Math.round(templateData.overlay.width * scaleX);
+      
+      scaledOverlay.x = (platformConfig.width - squareSize) / 2;
+      scaledOverlay.y = (platformConfig.height - squareSize) / 2;
+      scaledOverlay.width = squareSize;
+      scaledOverlay.height = squareSize;
+      
+      const qrSize = squareSize * 0.6;
+      scaledQR.x = scaledOverlay.x + (squareSize - qrSize) / 2;
+      scaledQR.y = scaledOverlay.y + (squareSize - qrSize) / 2 - 30;
+      scaledQR.size = qrSize;
+      
+      scaledCTA.x = scaledOverlay.x + 30;
+      scaledCTA.y = scaledQR.y + qrSize + 30;
+      scaledCTA.width = squareSize - 60;
+      scaledCTA.height = 50;
+    }
+    
+    return { scaledOverlay, scaledQR, scaledCTA };
+  };
+
   useEffect(() => {
     const scan = scans?.find((s) => s.id === selectedQR);
     const frame = templates?.find((t) => t.id === selectedTemplate);
@@ -109,19 +226,19 @@ export default function OverlayGeneratorPage() {
           return;
         }
 
-        const overlay = templateData.overlay;
-        const effectiveBorderRadius = borderRadius >= 0 ? borderRadius : overlay.borderRadius;
+        const { scaledOverlay, scaledQR, scaledCTA } = scaleOverlayForPlatform(templateData, safeArea, platformConfig);
+        const effectiveBorderRadius = borderRadius >= 0 ? borderRadius : templateData.overlay.borderRadius;
         
         ctx.save();
         
         if (effectiveBorderRadius > 0) {
           ctx.beginPath();
-          ctx.roundRect(overlay.x, overlay.y, overlay.width, overlay.height, effectiveBorderRadius);
-          ctx.fillStyle = overlay.backgroundColor;
+          ctx.roundRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height, effectiveBorderRadius);
+          ctx.fillStyle = templateData.overlay.backgroundColor;
           ctx.fill();
         } else {
-          ctx.fillStyle = overlay.backgroundColor;
-          ctx.fillRect(overlay.x, overlay.y, overlay.width, overlay.height);
+          ctx.fillStyle = templateData.overlay.backgroundColor;
+          ctx.fillRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
         }
         
         ctx.restore();
@@ -132,22 +249,25 @@ export default function OverlayGeneratorPage() {
           qrImage.src = qrDataUrl;
         });
 
-        ctx.drawImage(qrImage, safeArea.qr.x, safeArea.qr.y, safeArea.qr.size, safeArea.qr.size);
+        ctx.drawImage(qrImage, scaledQR.x, scaledQR.y, scaledQR.size, scaledQR.size);
 
-        if (ctaText && safeArea.cta) {
-          const textColor = overlay.backgroundColor.includes("rgba(255") || overlay.backgroundColor.includes("rgba(139") ? "#000000" : "#FFFFFF";
+        if (ctaText && scaledCTA) {
+          const textColor = templateData.overlay.backgroundColor.includes("rgba(255") || templateData.overlay.backgroundColor.includes("rgba(139") ? "#000000" : "#FFFFFF";
           const strokeColor = textColor === "#FFFFFF" ? "#000000" : "#FFFFFF";
+          
+          const isHorizontal = platformConfig.width > platformConfig.height;
+          const fontSize = isHorizontal ? 32 : 42;
           
           ctx.fillStyle = textColor;
           ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = 4;
-          ctx.font = "bold 42px Inter, sans-serif";
+          ctx.lineWidth = isHorizontal ? 3 : 4;
+          ctx.font = `bold ${fontSize}px Inter, sans-serif`;
           ctx.textAlign = safeArea.cta.align || "center";
           
-          const textX = safeArea.cta.align === "left" ? safeArea.cta.x + 20 : 
-                       safeArea.cta.align === "right" ? safeArea.cta.x + safeArea.cta.width - 20 :
-                       safeArea.cta.x + safeArea.cta.width / 2;
-          const textY = safeArea.cta.y + safeArea.cta.height / 2 + 14;
+          const textX = safeArea.cta.align === "left" ? scaledCTA.x + 20 : 
+                       safeArea.cta.align === "right" ? scaledCTA.x + scaledCTA.width - 20 :
+                       scaledCTA.x + scaledCTA.width / 2;
+          const textY = scaledCTA.y + scaledCTA.height / 2 + (fontSize / 3);
           
           ctx.strokeText(ctaText, textX, textY);
           ctx.fillText(ctaText, textX, textY);
