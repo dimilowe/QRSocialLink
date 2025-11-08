@@ -46,7 +46,9 @@ export default function CreateQRPage() {
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [backgroundImageType, setBackgroundImageType] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
+  const [animationFrame, setAnimationFrame] = useState<number | null>(null);
 
   const form = useForm<CreateQRFormData>({
     resolver: zodResolver(createQRFormSchema),
@@ -74,12 +76,18 @@ export default function CreateQRPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       setBackgroundImage(event.target?.result as string);
+      setBackgroundImageType(file.type);
     };
     reader.readAsDataURL(file);
   };
 
   const removeBackgroundImage = () => {
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      setAnimationFrame(null);
+    }
     setBackgroundImage(null);
+    setBackgroundImageType(null);
   };
 
   useEffect(() => {
@@ -117,59 +125,47 @@ export default function CreateQRPage() {
         canvas.width = qrSize + borderSize * 2;
         canvas.height = qrSize + borderSize * 2;
 
-        const drawQRContent = () => {
-          if (backgroundImage) {
-            const bgImg = new Image();
-            bgImg.onload = () => {
-              if (imageFit === "cover") {
-                const aspectRatio = bgImg.width / bgImg.height;
-                const canvasAspectRatio = canvas.width / canvas.height;
-                let drawWidth, drawHeight, offsetX, offsetY;
+        const drawImageOnCanvas = (image: HTMLImageElement | ImageBitmap, imgWidth: number, imgHeight: number) => {
+          if (imageFit === "cover") {
+            const aspectRatio = imgWidth / imgHeight;
+            const canvasAspectRatio = canvas.width / canvas.height;
+            let drawWidth, drawHeight, offsetX, offsetY;
 
-                if (aspectRatio > canvasAspectRatio) {
-                  drawHeight = canvas.height;
-                  drawWidth = drawHeight * aspectRatio;
-                  offsetX = (canvas.width - drawWidth) / 2;
-                  offsetY = 0;
-                } else {
-                  drawWidth = canvas.width;
-                  drawHeight = drawWidth / aspectRatio;
-                  offsetX = 0;
-                  offsetY = (canvas.height - drawHeight) / 2;
-                }
-                ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
-              } else if (imageFit === "contain") {
-                const aspectRatio = bgImg.width / bgImg.height;
-                const canvasAspectRatio = canvas.width / canvas.height;
-                let drawWidth, drawHeight, offsetX, offsetY;
+            if (aspectRatio > canvasAspectRatio) {
+              drawHeight = canvas.height;
+              drawWidth = drawHeight * aspectRatio;
+              offsetX = (canvas.width - drawWidth) / 2;
+              offsetY = 0;
+            } else {
+              drawWidth = canvas.width;
+              drawHeight = drawWidth / aspectRatio;
+              offsetX = 0;
+              offsetY = (canvas.height - drawHeight) / 2;
+            }
+            ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
+          } else if (imageFit === "contain") {
+            const aspectRatio = imgWidth / imgHeight;
+            const canvasAspectRatio = canvas.width / canvas.height;
+            let drawWidth, drawHeight, offsetX, offsetY;
 
-                if (aspectRatio > canvasAspectRatio) {
-                  drawWidth = canvas.width;
-                  drawHeight = drawWidth / aspectRatio;
-                  offsetX = 0;
-                  offsetY = (canvas.height - drawHeight) / 2;
-                } else {
-                  drawHeight = canvas.height;
-                  drawWidth = drawHeight * aspectRatio;
-                  offsetX = (canvas.width - drawWidth) / 2;
-                  offsetY = 0;
-                }
-                ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
-              } else {
-                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-              }
-
-              finishQR();
-            };
-            bgImg.src = backgroundImage;
+            if (aspectRatio > canvasAspectRatio) {
+              drawWidth = canvas.width;
+              drawHeight = drawWidth / aspectRatio;
+              offsetX = 0;
+              offsetY = (canvas.height - drawHeight) / 2;
+            } else {
+              drawHeight = canvas.height;
+              drawWidth = drawHeight * aspectRatio;
+              offsetX = (canvas.width - drawWidth) / 2;
+              offsetY = 0;
+            }
+            ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
           } else {
-            ctx.fillStyle = borderColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            finishQR();
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
           }
         };
 
-        const finishQR = () => {
+        const drawQROverlay = () => {
           const img = new Image();
           img.onload = () => {
             ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
@@ -200,15 +196,60 @@ export default function CreateQRPage() {
             ctx.font = "10px Inter, sans-serif";
             ctx.textAlign = "right";
             ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
+          };
+          img.src = qrDataUrl;
+        };
+
+        if (backgroundImage && backgroundImageType === "image/gif") {
+          const gifler = (await import("gifler")).default;
+          const previewCanvas = document.getElementById("qr-preview-canvas") as HTMLCanvasElement;
+          
+          if (!previewCanvas) {
+            console.error("Preview canvas not found");
+            setIsGenerating(false);
+            return;
+          }
+
+          const previewCtx = previewCanvas.getContext("2d");
+          if (!previewCtx) throw new Error("Canvas not supported");
+
+          previewCanvas.width = canvas.width;
+          previewCanvas.height = canvas.height;
+
+          let hasSetStaticPreview = false;
+
+          gifler(backgroundImage).frames(previewCanvas, (ctx: CanvasRenderingContext2D, frame: any) => {
+            ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            drawImageOnCanvas(frame.buffer, frame.width, frame.height);
+            drawQROverlay();
+
+            if (!hasSetStaticPreview) {
+              setQrImageUrl(previewCanvas.toDataURL("image/png"));
+              setIsGenerating(false);
+              hasSetStaticPreview = true;
+            }
+          });
+        } else if (backgroundImage) {
+          const bgImg = new Image();
+          bgImg.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawImageOnCanvas(bgImg, bgImg.width, bgImg.height);
+            drawQROverlay();
 
             const brandedDataUrl = canvas.toDataURL("image/png");
             setQrImageUrl(brandedDataUrl);
             setIsGenerating(false);
           };
-          img.src = qrDataUrl;
-        };
+          bgImg.src = backgroundImage;
+        } else {
+          ctx.fillStyle = borderColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          drawQROverlay();
 
-        drawQRContent();
+          const brandedDataUrl = canvas.toDataURL("image/png");
+          setQrImageUrl(brandedDataUrl);
+          setIsGenerating(false);
+        }
       } catch (err) {
         console.error("QR generation error:", err);
         setIsGenerating(false);
@@ -216,8 +257,13 @@ export default function CreateQRPage() {
     };
 
     const debounce = setTimeout(generateQR, 300);
-    return () => clearTimeout(debounce);
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit]);
+    return () => {
+      clearTimeout(debounce);
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, animationFrame]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -533,13 +579,27 @@ export default function CreateQRPage() {
               
               {qrImageUrl ? (
                 <div className="space-y-4">
-                  <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square">
-                    <img
-                      src={qrImageUrl}
-                      alt="QR Code Preview"
-                      className="max-w-full max-h-full"
-                      data-testid="img-qr-preview"
-                    />
+                  <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square relative">
+                    {backgroundImage && backgroundImageType === "image/gif" ? (
+                      <canvas
+                        id="qr-preview-canvas"
+                        className="max-w-full max-h-full"
+                        data-testid="canvas-qr-preview"
+                      />
+                    ) : (
+                      <img
+                        src={qrImageUrl}
+                        alt="QR Code Preview"
+                        className="max-w-full max-h-full"
+                        data-testid="img-qr-preview"
+                      />
+                    )}
+                    {backgroundImage && backgroundImageType === "image/gif" && (
+                      <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+                        <ImageIcon className="h-3 w-3" />
+                        Animated GIF
+                      </div>
+                    )}
                   </div>
                   
                   <Button
