@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -49,6 +49,7 @@ export default function CreateQRPage() {
   const [backgroundImageType, setBackgroundImageType] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
   const [giflerInstance, setGiflerInstance] = useState<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const form = useForm<CreateQRFormData>({
     resolver: zodResolver(createQRFormSchema),
@@ -201,7 +202,7 @@ export default function CreateQRPage() {
 
         if (backgroundImage && backgroundImageType === "image/gif") {
           const gifler = (await import("gifler")).default;
-          const previewCanvas = document.getElementById("qr-preview-canvas") as HTMLCanvasElement;
+          const previewCanvas = canvasRef.current;
           
           if (!previewCanvas) {
             console.error("Preview canvas not found");
@@ -343,11 +344,8 @@ export default function CreateQRPage() {
   const handleDownloadQR = () => {
     let downloadUrl = qrImageUrl;
 
-    if (backgroundImage && backgroundImageType === "image/gif") {
-      const canvas = document.getElementById("qr-preview-canvas") as HTMLCanvasElement;
-      if (canvas) {
-        downloadUrl = canvas.toDataURL("image/png");
-      }
+    if (backgroundImage && backgroundImageType === "image/gif" && canvasRef.current) {
+      downloadUrl = canvasRef.current.toDataURL("image/png");
     }
 
     if (!downloadUrl) return;
@@ -610,7 +608,7 @@ export default function CreateQRPage() {
                 {backgroundImage && backgroundImageType === "image/gif" ? (
                   <>
                     <canvas
-                      id="qr-preview-canvas"
+                      ref={canvasRef}
                       className="max-w-full max-h-full"
                       data-testid="canvas-qr-preview"
                     />
