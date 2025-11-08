@@ -517,17 +517,18 @@ export default function CreateQRPage() {
                                 alt="Background preview"
                                 className="w-full h-full object-cover"
                               />
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="icon"
-                                className="absolute top-2 right-2 z-10"
-                                onClick={removeBackgroundImage}
-                                data-testid="button-remove-background"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
                             </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={removeBackgroundImage}
+                              data-testid="button-remove-background"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Remove Background Image
+                            </Button>
                             <div className="space-y-2">
                               <FormLabel htmlFor="image-fit">Image Fit</FormLabel>
                               <Select value={imageFit} onValueChange={(value: "cover" | "contain" | "stretch") => setImageFit(value)}>
