@@ -1,0 +1,268 @@
+Architecture at a glance
+Stack: Node.js + Express (API), SQLite via Prisma (fast + free on Replit), React + Vite (frontend), FFmpeg (media worker), BullMQ/Redis (or in-process queue fallback) for jobs.
+Key objects: User, Campaign, Destination (A/B variants), QRCode, Frame (gif/mp4), RenderJob, ScanEvent.
+Flow: Visitor scans QR → hits redirector (records event) → A/B chooser picks destination → redirect → analytics dashboard updates. Overlay Mode uses a render job to composite QR + frame into an MP4/GIF in multiple aspect ratios (9:16, 1:1, 16:9).
+1) Backend (Express + Prisma)
+1.1 Bootstrapping
+New Replit (Node.js).
+Add deps:
+npm i express cors helmet zod nanoid qrcode sharp multer
+npm i prisma @prisma/client
+npm i bullmq ioredis # (optional – if you want Redis)
+Dev tools:
+npm i -D nodemon ts-node typescript @types/node @types/express
+npx prisma init
+FFmpeg: enable Nix in Replit and add ffmpeg to packages.
+1.2 Prisma schema (SQLite for MVP)
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  apiKey       String  @unique
+  createdAt    DateTime @default(now())
+  campaigns    Campaign[]
+  frames       Frame[]
+}
+
+model Campaign {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  slug          String   @unique // used in redirect URL
+  qrCodes       QRCode[]
+  destinations  Destination[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  abStrategy    String   @default("epsilon-greedy") // or "weighted"
+}
+
+model Destination {
+  id          String  @id @default(cuid())
+  campaignId  String
+  url         String
+  weight      Int     @default(1) // for "weighted" strategy
+  // live stats for bandit:
+  impressions Int     @default(0)
+  conversions Int     @default(0)
+}
+
+model QRCode {
+  id           String  @id @default(cuid())
+  campaignId   String
+  label        String
+  dynamicUrl   String  @unique // e.g. https://qr.yourdomain/r/abc123
+  staticSvg    String? // stored SVG for print
+  staticPng    String? // path to png
+  overlayRenditions OverlayRendition[]
+}
+
+model Frame {
+  id        String  @id @default(cuid())
+  userId    String
+  name      String
+  type      String // "gif" | "mp4" | "png" (static)
+  srcPath   String // uploaded asset path
+  safeArea  String // JSON: {x,y,w,h} where QR should live
+  loop      Boolean @default(true)
+}
+
+model OverlayRendition {
+  id         String  @id @default(cuid())
+  qrCodeId   String
+  frameId    String
+  status     String  @default("queued") // queued|processing|done|failed
+  outputPath String?
+  aspect     String // "9:16" | "1:1" | "16:9"
+  createdAt  DateTime @default(now())
+}
+
+model ScanEvent {
+  id          String  @id @default(cuid())
+  campaignId  String
+  qrCodeId    String
+  variantId   String? // Destination id chosen
+  userAgent   String?
+  ipHash      String? // privacy-friendly hash
+  ts          DateTime @default(now())
+  referrer    String?
+  country     String?
+  platform    String? // ios/android/desktop
+}
+1.3 API routes
+Auth (MVP): email + magic link or simple API key per user.
+Campaigns
+POST /api/campaigns – create {name, abStrategy}
+GET /api/campaigns/:id – details + live stats
+Destinations (A/B variants)
+POST /api/campaigns/:id/destinations – add {url, weight}
+PATCH /api/destinations/:id – update weight/URL
+Bandit updates happen server-side after conversions (optional).
+QR Codes
+POST /api/campaigns/:id/qrs – create dynamic link, return SVG/PNG
+GET /api/qrs/:id – fetch assets + overlay renditions
+Frames & Upload
+POST /api/frames – upload frame (gif/mp4/png) + safeArea
+GET /api/frames – list
+Overlay jobs
+POST /api/overlays/render – {qrCodeId, frameId, aspects: ["9:16","1:1","16:9"]}
+GET /api/overlays/:id – job status + output links
+Redirector (critical path)
+GET /r/:slug – resolves campaign by slug, choose variant via strategy, log ScanEvent, 302 redirect to destination.
+Webhooks (optional)
+POST /api/events/conversion – if you can signal “success” from the destination (button click/purchase), increment conversion on chosen Destination (supports bandit).
+1.4 A/B strategy logic
+Weighted random (simple):
+Sum weights; pick a random int in [1..sum]; map to variant.
+Epsilon-greedy bandit (better):
+With probability ε (e.g., 0.1) explore: pick random variant.
+Else exploit: pick variant with max conversions/impressions.
+On conversion webhook, increment conversions.
+1.5 Scan logging
+Hash IP (salted SHA-256) and store UA, referrer, guessed country (basic GeoIP library if desired). Keep it privacy-respectful.
+2) Front-end (React + Vite)
+2.1 Bootstrapping
+npm create vite@latest web -- --template react-ts
+cd web && npm i react-router-dom zod swr recharts
+2.2 Screens
+Dashboard
+Cards: Total scans, CTR by variant, top campaigns, last 7/30 days chart.
+Line chart (scans over time), pie chart (variant distribution).
+Create Campaign
+Fields: name, strategy dropdown (Weighted / Bandit).
+Add variants table with URL + weight.
+QR Builder
+Pick campaign → choose style:
+Classic: Static SVG/PNG export (size, margin, colors, logo in center).
+Overlay Mode: choose a Frame, pick aspects, click “Render”.
+Show “preview” mock (client-side faux overlay) while render job runs.
+Frames Library
+Upload frame asset, define safe area by dragging a rectangle overlay on a thumbnail (save {x,y,w,h} in % relative coords).
+Analytics
+Per campaign: scans timeline, per-variant stats (impressions, conv rate), map (country breakdown), device pie.
+2.3 QR generation (static)
+Use qrcode or qrcode-generator to render SVG (best for crisp prints).
+Offer “Download PNG” via sharp on the server (/api/qrs/:id/png?size=1024).
+3) FFmpeg compositing (Overlay Mode)
+3.1 Concepts
+Frame: mp4/gif loop with a transparent or keyed area where the QR sits (the safe area).
+QR layer: convert SVG → PNG (e.g., 1024×1024), then scale to safeArea.w × safeArea.h.
+Compositions: export for 9:16, 1:1, 16:9. If the frame is a different aspect, letterbox with black (or transparent if webm).
+3.2 Worker process
+A simple job consumer that:
+Loads Frame.srcPath and QRCode.staticPng
+Scales frame to target aspect/size (e.g., 1080×1920)
+Scales QR to safeArea
+Overlays QR onto frame for the full duration (loop if GIF)
+Outputs .mp4 and an auto-looping .gif teaser (optional)
+3.3 Example commands
+Scale base frame to 1080×1920 (pad if needed):
+ffmpeg -y -i frame.mp4 -vf "scale=1080:-2, pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black" -r 30 frame_9x16.mp4
+Overlay QR (PNG) at safe area (x,y,w,h in pixels):
+# Pre-scale QR to the safe area size
+ffmpeg -y -i qr.png -vf "scale=400:400" qr_scaled.png
+
+# Composite for full duration
+ffmpeg -y -i frame_9x16.mp4 -i qr_scaled.png -filter_complex "overlay=100:120:format=auto" -c:a copy out_9x16.mp4
+If the frame is a GIF: first convert to MP4 loop:
+ffmpeg -y -stream_loop -1 -t 8 -i frame.gif -vf "fps=30,scale=1080:-2:flags=lanczos" frame_loop.mp4
+ffmpeg -y -i frame_loop.mp4 -i qr_scaled.png -filter_complex "overlay=100:120" out_9x16.mp4
+Optional glow/brand text layer:
+Pre-render PNG of text/logo (brand.png), then:
+ffmpeg -y -i out_9x16.mp4 -i brand.png -filter_complex "overlay=W-w-60:H-h-60" out_brand_9x16.mp4
+Generate a short GIF teaser (for previews):
+ffmpeg -y -i out_9x16.mp4 -t 3 -vf "fps=12,scale=540:-2:flags=lanczos" out_9x16.gif
+Store outputs under /public/renders/{user}/{campaign}/{qrId}/{aspect}/…
+3.4 Job API
+POST /api/overlays/render enqueues a RenderJob for each aspect.
+Worker writes outputPath + sets status to done (or failed with logs).
+4) Overlay Mode: how it behaves on social
+You cannot make the video itself “interactive” on TikTok/IG. The overlay is visual only.
+Interaction happens when viewers scan the QR or follow on-screen CTA to your bio link.
+Best practices:
+Include animated border/pulse to draw eye to the QR.
+Add subtitle CTA: “Scan me” or “Open Camera to scan”.
+Export 9:16 for TikTok/Reels, 1:1 for feed, 16:9 for YouTube.
+5) Analytics & A/B testing details
+5.1 Event capture
+On GET /r/:slug:
+Resolve campaign.
+Choose variant (weighted or bandit).
+Create ScanEvent with timestamp + UA + country.
+Increment Destination.impressions.
+302 redirect to chosen URL.
+5.2 Conversion signals (optional)
+Add ?v={destinationId} query to destination URL so the page (your landing) can call:
+POST /api/events/conversion with {campaignId, destinationId} on purchase/CTA click.
+Server increments conversions → improves bandit exploitation.
+5.3 Dashboard metrics
+Scans over time (by campaign).
+Variant table: impressions, conversions, CR%.
+Aspect performance (if you want to compare 9:16 vs 1:1).
+Geo/device breakdown.
+6) Replit project structure
+/api
+  /src
+    index.ts (Express)
+    routes/ (campaigns.ts, qrs.ts, frames.ts, overlays.ts, redirect.ts)
+    services/ (ab.ts, render.ts, qr.ts, stats.ts)
+    prisma/
+      schema.prisma
+    workers/
+      overlayWorker.ts
+  package.json
+/web
+  src/ (React app)
+  vite.config.ts
+  package.json
+/shared
+  types.ts
+/public
+  /frames   (uploaded)
+  /renders  (outputs)
+.replit
+replit.nix   # add ffmpeg
+replit.nix (add these packages):
+{ pkgs }: {
+  deps = [
+    pkgs.nodejs-18_x
+    pkgs.ffmpeg
+    pkgs.git
+  ];
+}
+7) Concrete task list (copy/paste checklist)
+Backend
+ Init Express + Prisma (SQLite).
+ Add models & migrate: npx prisma migrate dev.
+ Implement /api/campaigns CRUD.
+ Implement /api/campaigns/:id/destinations CRUD.
+ Implement QR creation: generate slug + dynamic URL; save SVG/PNG.
+ Implement /r/:slug redirect + event logging + A/B strategy.
+ File uploads for frames (Multer) → /public/frames/{user}/….
+ Overlay job enqueue + status endpoints.
+ (Optional) /api/events/conversion webhook.
+Worker (FFmpeg)
+ Write overlayWorker.ts: consume jobs, load frame + QR, compute pixel coords from safeArea %, run FFmpeg commands, save outputs, update DB status.
+ Handle GIF→MP4 loop; generate 9:16, 1:1, 16:9.
+ Add error logs to DB for failed jobs.
+Frontend
+ Auth stub (API key input or simple login).
+ Campaigns: create/edit + add destinations.
+ QR Builder: show dynamic URL; export static SVG/PNG; Overlay Mode picker (frame + aspects) → call render API; show job statuses + download buttons.
+ Frames Library: upload frame; visual safe-area editor (drag to set {x,y,w,h} in %).
+ Analytics: charts for scans by day, variant table, geo/device.
+DevOps & polish
+ Add helmet, cors rules, rate limiting on /r/:slug.
+ Generate vanity subdomains (optional) like qr.yourbrand.com/r/slug.
+ CDN-friendly headers for /public/renders/**.
+ Admin page for deleting old renders.
+8) UX copy & constraints
+On QR Builder: “Animated frames increase scan rate by drawing focus to the QR. Use bright motion & clear CTA text.”
+On Frames upload: display a template grid to help set safe area for 9:16/1:1/16:9.
+On Analytics: show “Statistically confident winner” badge when one variant beats others (e.g., Wilson score / Bayesian).
+9) Security, abuse, and limits
+Per-user quotas: max campaigns, daily scans, render minutes.
+Sanitize URLs; allow only http/https; block obvious malware domains.
+Hash IPs; let users toggle geostats on/off for privacy.
+10) Fast demo data seeding
+Seed 2 campaigns with 2–3 destinations each.
+Seed a couple of frames.
+Pre-render one overlay for instant “wow”.

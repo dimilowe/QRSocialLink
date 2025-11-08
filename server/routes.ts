@@ -2,7 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
-import { insertScanSchema, insertCommentSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { nanoid } from "nanoid";
+import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { createABStrategy } from "./services/ab-testing";
+import crypto from "crypto";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
@@ -268,6 +271,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(comment);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/campaigns", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const slug = nanoid(10);
+      const validatedData = insertCampaignSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+        slug,
+      });
+      const campaign = await storage.createCampaign(validatedData);
+      res.json(campaign);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/campaigns", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaigns = await storage.getUserCampaigns(req.user.id);
+      res.json(campaigns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      if (campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      
+      const destinations = await storage.getCampaignDestinations(campaign.id);
+      const events = await storage.getCampaignEvents(campaign.id, 1000);
+      
+      res.json({
+        ...campaign,
+        destinations,
+        totalScans: events.length,
+        totalConversions: destinations.reduce((sum, d) => sum + d.conversions, 0),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      if (campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const updateSchema = insertCampaignSchema.partial().omit({ userId: true, slug: true });
+      const validatedData = updateSchema.parse(req.body);
+      const updated = await storage.updateCampaign(req.params.id, validatedData);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/campaigns/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      if (campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      await storage.deleteCampaign(req.params.id);
+      res.json({ message: "Campaign deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/campaigns/:campaignId/destinations", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const campaign = await storage.getCampaign(req.params.campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      if (campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const validatedData = insertDestinationSchema.parse({
+        ...req.body,
+        campaignId: req.params.campaignId,
+      });
+      const destination = await storage.createDestination(validatedData);
+      res.json(destination);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/destinations/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const destination = await storage.getDestination(req.params.id);
+      if (!destination) {
+        return res.status(404).json({ message: "Destination not found" });
+      }
+
+      const campaign = await storage.getCampaign(destination.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const updateSchema = insertDestinationSchema.partial().omit({ campaignId: true });
+      const validatedData = updateSchema.parse(req.body);
+      const updated = await storage.updateDestination(req.params.id, validatedData);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/destinations/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const destination = await storage.getDestination(req.params.id);
+      if (!destination) {
+        return res.status(404).json({ message: "Destination not found" });
+      }
+
+      const campaign = await storage.getCampaign(destination.campaignId);
+      if (!campaign || campaign.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      await storage.deleteDestination(req.params.id);
+      res.json({ message: "Destination deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/r/:slug", async (req, res) => {
+    try {
+      const campaign = await storage.getCampaignBySlug(req.params.slug);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      const destinations = await storage.getCampaignDestinations(campaign.id);
+      if (destinations.length === 0) {
+        return res.status(404).json({ message: "No destinations configured" });
+      }
+
+      const strategy = createABStrategy(campaign.abStrategy);
+      const selectedDestination = strategy.selectDestination(destinations);
+
+      const ipHash = crypto
+        .createHash("sha256")
+        .update((req.ip || "unknown") + (process.env.SESSION_SECRET || "salt"))
+        .digest("hex");
+
+      await storage.createScanEvent({
+        campaignId: campaign.id,
+        destinationId: selectedDestination.id,
+        userAgent: req.headers["user-agent"] || null,
+        ipHash,
+        referrer: req.headers.referer || null,
+        country: null,
+        platform: null,
+        scanId: null,
+      });
+
+      await storage.incrementDestinationImpressions(selectedDestination.id);
+
+      res.redirect(302, selectedDestination.url);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/events/conversion", async (req, res) => {
+    try {
+      const { campaignId, destinationId } = req.body;
+      if (!destinationId) {
+        return res.status(400).json({ message: "Missing destinationId" });
+      }
+
+      await storage.incrementDestinationConversions(destinationId);
+      res.json({ message: "Conversion recorded" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

@@ -7,6 +7,11 @@ import {
   likes,
   comments,
   qrDrops,
+  campaigns,
+  destinations,
+  frames,
+  overlayRenditions,
+  scanEvents,
   type User,
   type InsertUser,
   type Scan,
@@ -19,8 +24,19 @@ import {
   type InsertComment,
   type QrDrop,
   type InsertQrDrop,
+  type Campaign,
+  type InsertCampaign,
+  type Destination,
+  type InsertDestination,
+  type Frame,
+  type InsertFrame,
+  type OverlayRendition,
+  type InsertOverlayRendition,
+  type ScanEvent,
+  type InsertScanEvent,
   type ScanWithUser,
   type CommentWithUser,
+  type CampaignWithStats,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -63,6 +79,24 @@ export interface IStorage {
     followersCount: number;
     followingCount: number;
   }>;
+
+  createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  getCampaign(id: string): Promise<Campaign | undefined>;
+  getCampaignBySlug(slug: string): Promise<Campaign | undefined>;
+  getUserCampaigns(userId: string): Promise<Campaign[]>;
+  updateCampaign(campaignId: string, updates: Partial<Campaign>): Promise<Campaign>;
+  deleteCampaign(campaignId: string): Promise<void>;
+  
+  createDestination(destination: InsertDestination): Promise<Destination>;
+  getDestination(id: string): Promise<Destination | undefined>;
+  getCampaignDestinations(campaignId: string): Promise<Destination[]>;
+  updateDestination(destinationId: string, updates: Partial<Destination>): Promise<Destination>;
+  deleteDestination(destinationId: string): Promise<void>;
+  incrementDestinationImpressions(destinationId: string): Promise<void>;
+  incrementDestinationConversions(destinationId: string): Promise<void>;
+  
+  createScanEvent(event: InsertScanEvent): Promise<ScanEvent>;
+  getCampaignEvents(campaignId: string, limit?: number): Promise<ScanEvent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -371,6 +405,101 @@ export class DatabaseStorage implements IStorage {
       followersCount: followersCountResult[0]?.count || 0,
       followingCount: followingCountResult[0]?.count || 0,
     };
+  }
+
+  async createCampaign(insertCampaign: InsertCampaign): Promise<Campaign> {
+    const result = await db.insert(campaigns).values(insertCampaign).returning();
+    return result[0];
+  }
+
+  async getCampaign(id: string): Promise<Campaign | undefined> {
+    const result = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCampaignBySlug(slug: string): Promise<Campaign | undefined> {
+    const result = await db.select().from(campaigns).where(eq(campaigns.slug, slug)).limit(1);
+    return result[0];
+  }
+
+  async getUserCampaigns(userId: string): Promise<Campaign[]> {
+    return await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.userId, userId))
+      .orderBy(desc(campaigns.createdAt));
+  }
+
+  async updateCampaign(campaignId: string, updates: Partial<Campaign>): Promise<Campaign> {
+    const result = await db
+      .update(campaigns)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(campaigns.id, campaignId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCampaign(campaignId: string): Promise<void> {
+    await db.delete(campaigns).where(eq(campaigns.id, campaignId));
+  }
+
+  async createDestination(insertDestination: InsertDestination): Promise<Destination> {
+    const result = await db.insert(destinations).values(insertDestination).returning();
+    return result[0];
+  }
+
+  async getDestination(id: string): Promise<Destination | undefined> {
+    const result = await db.select().from(destinations).where(eq(destinations.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCampaignDestinations(campaignId: string): Promise<Destination[]> {
+    return await db
+      .select()
+      .from(destinations)
+      .where(eq(destinations.campaignId, campaignId))
+      .orderBy(desc(destinations.createdAt));
+  }
+
+  async updateDestination(destinationId: string, updates: Partial<Destination>): Promise<Destination> {
+    const result = await db
+      .update(destinations)
+      .set(updates)
+      .where(eq(destinations.id, destinationId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDestination(destinationId: string): Promise<void> {
+    await db.delete(destinations).where(eq(destinations.id, destinationId));
+  }
+
+  async incrementDestinationImpressions(destinationId: string): Promise<void> {
+    await db
+      .update(destinations)
+      .set({ impressions: sql`${destinations.impressions} + 1` })
+      .where(eq(destinations.id, destinationId));
+  }
+
+  async incrementDestinationConversions(destinationId: string): Promise<void> {
+    await db
+      .update(destinations)
+      .set({ conversions: sql`${destinations.conversions} + 1` })
+      .where(eq(destinations.id, destinationId));
+  }
+
+  async createScanEvent(insertEvent: InsertScanEvent): Promise<ScanEvent> {
+    const result = await db.insert(scanEvents).values(insertEvent).returning();
+    return result[0];
+  }
+
+  async getCampaignEvents(campaignId: string, limit: number = 1000): Promise<ScanEvent[]> {
+    return await db
+      .select()
+      .from(scanEvents)
+      .where(eq(scanEvents.campaignId, campaignId))
+      .orderBy(desc(scanEvents.timestamp))
+      .limit(limit);
   }
 }
 

@@ -54,9 +54,11 @@ export const users = pgTable("users", {
 export const scans = pgTable("scans", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
   qrImageUrl: text("qr_image_url").notNull(),
   decodedUrl: text("decoded_url").notNull(),
   redirectUrl: text("redirect_url"),
+  dynamicSlug: text("dynamic_slug"),
   title: text("title"),
   type: text("type").notNull().default("scanned"),
   isPublic: boolean("is_public").notNull().default(true),
@@ -103,6 +105,62 @@ export const qrDrops = pgTable("qr_drops", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const campaigns = pgTable("campaigns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  abStrategy: text("ab_strategy").notNull().default("epsilon-greedy"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const destinations = pgTable("destinations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  weight: integer("weight").notNull().default(1),
+  impressions: integer("impressions").notNull().default(0),
+  conversions: integer("conversions").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const frames = pgTable("frames", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  srcPath: text("src_path").notNull(),
+  safeArea: text("safe_area").notNull(),
+  loop: boolean("loop").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const overlayRenditions = pgTable("overlay_renditions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scanId: uuid("scan_id").notNull().references(() => scans.id, { onDelete: "cascade" }),
+  frameId: uuid("frame_id").notNull().references(() => frames.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("queued"),
+  outputPath: text("output_path"),
+  aspect: text("aspect").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const scanEvents = pgTable("scan_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+  scanId: uuid("scan_id").references(() => scans.id, { onDelete: "set null" }),
+  destinationId: uuid("destination_id").references(() => destinations.id, { onDelete: "set null" }),
+  userAgent: text("user_agent"),
+  ipHash: text("ip_hash"),
+  referrer: text("referrer"),
+  country: text("country"),
+  platform: text("platform"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -137,6 +195,35 @@ export const insertQrDropSchema = createInsertSchema(qrDrops).omit({
   scanCount: true,
 });
 
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDestinationSchema = createInsertSchema(destinations).omit({
+  id: true,
+  createdAt: true,
+  impressions: true,
+  conversions: true,
+});
+
+export const insertFrameSchema = createInsertSchema(frames).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const insertScanEventSchema = createInsertSchema(scanEvents).omit({
+  id: true,
+  timestamp: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -155,6 +242,21 @@ export type Comment = typeof comments.$inferSelect;
 export type InsertQrDrop = z.infer<typeof insertQrDropSchema>;
 export type QrDrop = typeof qrDrops.$inferSelect;
 
+export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+export type Campaign = typeof campaigns.$inferSelect;
+
+export type InsertDestination = z.infer<typeof insertDestinationSchema>;
+export type Destination = typeof destinations.$inferSelect;
+
+export type InsertFrame = z.infer<typeof insertFrameSchema>;
+export type Frame = typeof frames.$inferSelect;
+
+export type InsertOverlayRendition = z.infer<typeof insertOverlayRenditionSchema>;
+export type OverlayRendition = typeof overlayRenditions.$inferSelect;
+
+export type InsertScanEvent = z.infer<typeof insertScanEventSchema>;
+export type ScanEvent = typeof scanEvents.$inferSelect;
+
 export type ScanWithUser = Scan & {
   user: User;
   likesCount: number;
@@ -164,4 +266,10 @@ export type ScanWithUser = Scan & {
 
 export type CommentWithUser = Comment & {
   user: User;
+};
+
+export type CampaignWithStats = Campaign & {
+  totalScans: number;
+  totalConversions: number;
+  destinationCount: number;
 };
