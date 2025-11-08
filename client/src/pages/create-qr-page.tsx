@@ -202,14 +202,18 @@ export default function CreateQRPage() {
 
         if (backgroundImage && backgroundImageType === "image/gif") {
           const gifler = (await import("gifler")).default;
+          
+          await new Promise(resolve => setTimeout(resolve, 0));
+          
           const previewCanvas = canvasRef.current;
           
           if (!previewCanvas) {
-            console.error("Preview canvas not found");
+            console.error("Preview canvas not found", canvasRef);
             setIsGenerating(false);
             return;
           }
 
+          console.log("Canvas found, setting up GIF animation", previewCanvas);
           previewCanvas.width = totalSize;
           previewCanvas.height = totalSize;
 
@@ -227,6 +231,7 @@ export default function CreateQRPage() {
             }
           });
 
+          console.log("Gifler instance created", currentGifler);
           setGiflerInstance(currentGifler);
         } else if (backgroundImage) {
           const canvas = document.createElement("canvas");
@@ -609,7 +614,9 @@ export default function CreateQRPage() {
                   <>
                     <canvas
                       ref={canvasRef}
-                      className="max-w-full max-h-full"
+                      width={600}
+                      height={600}
+                      className="max-w-full max-h-full object-contain"
                       data-testid="canvas-qr-preview"
                     />
                     <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
