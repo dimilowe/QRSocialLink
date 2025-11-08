@@ -48,7 +48,7 @@ export default function CreateQRPage() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundImageType, setBackgroundImageType] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
-  const [animationFrame, setAnimationFrame] = useState<number | null>(null);
+  const [giflerInstance, setGiflerInstance] = useState<any>(null);
 
   const form = useForm<CreateQRFormData>({
     resolver: zodResolver(createQRFormSchema),
@@ -82,10 +82,10 @@ export default function CreateQRPage() {
   };
 
   const removeBackgroundImage = () => {
-    if (animationFrame) {
-      cancelAnimationFrame(animationFrame);
-      setAnimationFrame(null);
+    if (giflerInstance && giflerInstance.stop) {
+      giflerInstance.stop();
     }
+    setGiflerInstance(null);
     setBackgroundImage(null);
     setBackgroundImageType(null);
   };
@@ -95,6 +95,8 @@ export default function CreateQRPage() {
       setQrImageUrl("");
       return;
     }
+
+    let currentGifler: any = null;
 
     const generateQR = async () => {
       setIsGenerating(true);
@@ -116,88 +118,85 @@ export default function CreateQRPage() {
           return;
         }
 
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas not supported");
-
         const borderSize = 60;
         const qrSize = 400;
-        canvas.width = qrSize + borderSize * 2;
-        canvas.height = qrSize + borderSize * 2;
+        const totalSize = qrSize + borderSize * 2;
 
-        const drawImageOnCanvas = (image: HTMLImageElement | ImageBitmap, imgWidth: number, imgHeight: number) => {
+        const drawImageOnCanvas = (ctx: CanvasRenderingContext2D, image: HTMLImageElement | ImageBitmap, imgWidth: number, imgHeight: number, canvasWidth: number, canvasHeight: number) => {
           if (imageFit === "cover") {
             const aspectRatio = imgWidth / imgHeight;
-            const canvasAspectRatio = canvas.width / canvas.height;
+            const canvasAspectRatio = canvasWidth / canvasHeight;
             let drawWidth, drawHeight, offsetX, offsetY;
 
             if (aspectRatio > canvasAspectRatio) {
-              drawHeight = canvas.height;
+              drawHeight = canvasHeight;
               drawWidth = drawHeight * aspectRatio;
-              offsetX = (canvas.width - drawWidth) / 2;
+              offsetX = (canvasWidth - drawWidth) / 2;
               offsetY = 0;
             } else {
-              drawWidth = canvas.width;
+              drawWidth = canvasWidth;
               drawHeight = drawWidth / aspectRatio;
               offsetX = 0;
-              offsetY = (canvas.height - drawHeight) / 2;
+              offsetY = (canvasHeight - drawHeight) / 2;
             }
             ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
           } else if (imageFit === "contain") {
             const aspectRatio = imgWidth / imgHeight;
-            const canvasAspectRatio = canvas.width / canvas.height;
+            const canvasAspectRatio = canvasWidth / canvasHeight;
             let drawWidth, drawHeight, offsetX, offsetY;
 
             if (aspectRatio > canvasAspectRatio) {
-              drawWidth = canvas.width;
+              drawWidth = canvasWidth;
               drawHeight = drawWidth / aspectRatio;
               offsetX = 0;
-              offsetY = (canvas.height - drawHeight) / 2;
+              offsetY = (canvasHeight - drawHeight) / 2;
             } else {
-              drawHeight = canvas.height;
+              drawHeight = canvasHeight;
               drawWidth = drawHeight * aspectRatio;
-              offsetX = (canvas.width - drawWidth) / 2;
+              offsetX = (canvasWidth - drawWidth) / 2;
               offsetY = 0;
             }
             ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
           } else {
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvasWidth, canvasHeight);
           }
         };
 
-        const drawQROverlay = () => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
+        const qrImage = new Image();
+        await new Promise((resolve) => {
+          qrImage.onload = resolve;
+          qrImage.src = qrDataUrl;
+        });
 
-            if (enableBranding) {
-              if (topText) {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 3;
-                ctx.font = "bold 24px Inter, sans-serif";
-                ctx.textAlign = "center";
-                ctx.strokeText(topText, canvas.width / 2, 35);
-                ctx.fillText(topText, canvas.width / 2, 35);
-              }
+        const drawQROverlay = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
+          ctx.drawImage(qrImage, borderSize, borderSize, qrSize, qrSize);
 
-              if (bottomText) {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 3;
-                ctx.font = "16px Inter, sans-serif";
-                ctx.textAlign = "center";
-                ctx.strokeText(bottomText, canvas.width / 2, canvas.height - 25);
-                ctx.fillText(bottomText, canvas.width / 2, canvas.height - 25);
-              }
+          if (enableBranding) {
+            if (topText) {
+              ctx.fillStyle = "#FFFFFF";
+              ctx.strokeStyle = "#000000";
+              ctx.lineWidth = 3;
+              ctx.font = "bold 24px Inter, sans-serif";
+              ctx.textAlign = "center";
+              ctx.strokeText(topText, canvasWidth / 2, 35);
+              ctx.fillText(topText, canvasWidth / 2, 35);
             }
 
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.font = "10px Inter, sans-serif";
-            ctx.textAlign = "right";
-            ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
-          };
-          img.src = qrDataUrl;
+            if (bottomText) {
+              ctx.fillStyle = "#FFFFFF";
+              ctx.strokeStyle = "#000000";
+              ctx.lineWidth = 3;
+              ctx.font = "16px Inter, sans-serif";
+              ctx.textAlign = "center";
+              ctx.strokeText(bottomText, canvasWidth / 2, canvasHeight - 25);
+              ctx.fillText(bottomText, canvasWidth / 2, canvasHeight - 25);
+            }
+          }
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.font = "10px Inter, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText("Made with QR Social", canvasWidth - 10, canvasHeight - 10);
         };
 
         if (backgroundImage && backgroundImageType === "image/gif") {
@@ -210,18 +209,15 @@ export default function CreateQRPage() {
             return;
           }
 
-          const previewCtx = previewCanvas.getContext("2d");
-          if (!previewCtx) throw new Error("Canvas not supported");
-
-          previewCanvas.width = canvas.width;
-          previewCanvas.height = canvas.height;
+          previewCanvas.width = totalSize;
+          previewCanvas.height = totalSize;
 
           let hasSetStaticPreview = false;
 
-          gifler(backgroundImage).frames(previewCanvas, (ctx: CanvasRenderingContext2D, frame: any) => {
+          currentGifler = gifler(backgroundImage).frames(previewCanvas, (ctx: CanvasRenderingContext2D, frame: any) => {
             ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-            drawImageOnCanvas(frame.buffer, frame.width, frame.height);
-            drawQROverlay();
+            drawImageOnCanvas(ctx, frame.buffer, frame.width, frame.height, previewCanvas.width, previewCanvas.height);
+            drawQROverlay(ctx, previewCanvas.width, previewCanvas.height);
 
             if (!hasSetStaticPreview) {
               setQrImageUrl(previewCanvas.toDataURL("image/png"));
@@ -229,12 +225,21 @@ export default function CreateQRPage() {
               hasSetStaticPreview = true;
             }
           });
+
+          setGiflerInstance(currentGifler);
         } else if (backgroundImage) {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas not supported");
+
+          canvas.width = totalSize;
+          canvas.height = totalSize;
+
           const bgImg = new Image();
           bgImg.onload = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawImageOnCanvas(bgImg, bgImg.width, bgImg.height);
-            drawQROverlay();
+            drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, canvas.width, canvas.height);
+            drawQROverlay(ctx, canvas.width, canvas.height);
 
             const brandedDataUrl = canvas.toDataURL("image/png");
             setQrImageUrl(brandedDataUrl);
@@ -242,9 +247,16 @@ export default function CreateQRPage() {
           };
           bgImg.src = backgroundImage;
         } else {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas not supported");
+
+          canvas.width = totalSize;
+          canvas.height = totalSize;
+
           ctx.fillStyle = borderColor;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          drawQROverlay();
+          drawQROverlay(ctx, canvas.width, canvas.height);
 
           const brandedDataUrl = canvas.toDataURL("image/png");
           setQrImageUrl(brandedDataUrl);
@@ -259,11 +271,14 @@ export default function CreateQRPage() {
     const debounce = setTimeout(generateQR, 300);
     return () => {
       clearTimeout(debounce);
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
+      if (currentGifler && currentGifler.stop) {
+        currentGifler.stop();
+      }
+      if (giflerInstance && giflerInstance.stop) {
+        giflerInstance.stop();
       }
     };
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, animationFrame]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
