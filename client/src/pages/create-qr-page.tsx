@@ -521,7 +521,7 @@ export default function CreateQRPage() {
                                 type="button"
                                 variant="destructive"
                                 size="icon"
-                                className="absolute top-2 right-2"
+                                className="absolute top-2 right-2 z-10"
                                 onClick={removeBackgroundImage}
                                 data-testid="button-remove-background"
                               >
