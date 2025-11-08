@@ -1,4 +1,4 @@
-import { Home, Plus, BarChart3, User } from "lucide-react";
+import { Home, Plus, BarChart3, LayoutDashboard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -12,7 +12,7 @@ export function BottomNav() {
   const navItems = [
     {
       icon: Home,
-      label: "Feed",
+      label: "Home",
       path: "/",
     },
     {
@@ -26,9 +26,9 @@ export function BottomNav() {
       path: "/campaigns",
     },
     {
-      icon: User,
-      label: "Profile",
-      path: `/profile/${user.id}`,
+      icon: LayoutDashboard,
+      label: "QR Codes",
+      path: "/dashboard",
     },
   ];
 

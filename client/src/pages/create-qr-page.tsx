@@ -152,13 +152,12 @@ export default function CreateQRPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/scans"] });
       toast({
         title: "QR Code created!",
-        description: "Your QR code has been posted to the feed",
+        description: "Your QR code has been saved to your dashboard",
       });
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: (error: Error) => {
       toast({
@@ -210,7 +209,7 @@ export default function CreateQRPage() {
               Create QR Code
             </h1>
             <p className="text-sm text-muted-foreground">
-              Generate a custom QR code and share it to the feed
+              Generate custom branded QR codes for your marketing campaigns
             </p>
           </div>
         </div>
@@ -418,7 +417,7 @@ export default function CreateQRPage() {
         {!user && (
           <Card className="p-4 bg-muted/50">
             <p className="text-sm text-muted-foreground text-center">
-              Log in to save and share your QR codes to the feed
+              Log in to create and manage your QR codes
             </p>
           </Card>
         )}

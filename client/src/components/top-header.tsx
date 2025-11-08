@@ -14,10 +14,10 @@ export function TopHeader() {
   };
 
   const navItems = [
-    { icon: Home, label: "Feed", path: "/" },
-    { icon: Plus, label: "Create", path: "/create" },
+    { icon: Home, label: "Home", path: "/" },
+    { icon: Plus, label: "Create QR", path: "/create" },
     { icon: BarChart3, label: "Campaigns", path: "/campaigns" },
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: LayoutDashboard, label: "My QR Codes", path: "/dashboard" },
   ];
 
   return (

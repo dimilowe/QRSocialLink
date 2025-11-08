@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
-import FeedPage from "@/pages/feed-page";
+import HomePage from "@/pages/home-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
 import CreateQRPage from "@/pages/create-qr-page";
@@ -54,7 +54,7 @@ function Router() {
             return user ? <Redirect to="/" /> : <AuthPage />;
           }}
         </Route>
-        <Route path="/" component={FeedPage} />
+        <Route path="/" component={HomePage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
         <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
