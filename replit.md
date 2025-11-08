@@ -73,6 +73,14 @@ This configuration has been battle-tested and resolves SSL certificate issues th
   - Upload animated GIFs as QR code backgrounds with real-time preview using DOM layering (img tag + transparent QR overlay).
   - Backend FFmpeg processing overlays transparent QR code on each frame of animated GIF for download.
   - Supports image fit modes (cover/contain/stretch) with proper frame scaling.
+- **Platform-Specific Overlay Generator**: 
+  - Create social media-optimized overlay frames that nest QR codes within platform templates (TikTok, YouTube Shorts, Instagram Reels).
+  - Platform presets with accurate safe zones: TikTok (131px top, 367px bottom), Instagram Reels, YouTube Shorts (all 1080x1920, 9:16 aspect ratio).
+  - Customizable CTA text (max 120 characters) for maximum engagement.
+  - Authenticated overlay endpoints with Zod validation for data integrity.
+  - Database schema: overlayRenditions table stores generated overlays with status tracking, frames table holds template metadata.
+  - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history).
+  - Security: All endpoints require authentication, proper authorization (user owns QR code), input validation with max length enforcement.
 
 ## External Dependencies
 
