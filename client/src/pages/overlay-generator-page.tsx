@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { PLATFORM_PRESETS } from "@shared/schema";
-import { Sparkles, Download, Eye, Video } from "lucide-react";
+import { Sparkles, Download, Eye, Video, Square } from "lucide-react";
 import type { Scan, Frame } from "@shared/schema";
 
 export default function OverlayGeneratorPage() {
@@ -15,6 +16,7 @@ export default function OverlayGeneratorPage() {
   const [selectedQR, setSelectedQR] = useState<string>("");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [ctaText, setCtaText] = useState<string>("Scan to Shop");
+  const [borderRadius, setBorderRadius] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -32,6 +34,22 @@ export default function OverlayGeneratorPage() {
 
   const selectedScan = scans?.find((s) => s.id === selectedQR);
   const selectedFrame = templates?.find((t) => t.id === selectedTemplate);
+
+  useEffect(() => {
+    if (!selectedFrame) {
+      setBorderRadius(0);
+      return;
+    }
+
+    try {
+      const templateData = JSON.parse(selectedFrame.srcPath);
+      if (templateData.overlay && templateData.overlay.borderRadius !== undefined) {
+        setBorderRadius(templateData.overlay.borderRadius);
+      }
+    } catch (e) {
+      setBorderRadius(0);
+    }
+  }, [selectedFrame]);
 
   useEffect(() => {
     const scan = scans?.find((s) => s.id === selectedQR);
@@ -64,47 +82,49 @@ export default function OverlayGeneratorPage() {
         canvas.width = platformConfig.width;
         canvas.height = platformConfig.height;
 
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, "#1a1a1a");
+        gradient.addColorStop(1, "#2d2d2d");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         let templateData;
         try {
           templateData = JSON.parse(frame.srcPath);
         } catch (e) {
           console.error("Failed to parse template data:", e);
-          templateData = { type: "solid", backgroundColor: "#1a1a1a" };
+          return;
         }
-
-        if (templateData.type === "gradient") {
-          const gradient = ctx.createLinearGradient(
-            templateData.direction === "diagonal" ? 0 : canvas.width / 2,
-            templateData.direction === "diagonal" ? 0 : 0,
-            templateData.direction === "diagonal" ? canvas.width : canvas.width / 2,
-            templateData.direction === "diagonal" ? canvas.height : canvas.height
-          );
-          gradient.addColorStop(0, templateData.colors[0]);
-          gradient.addColorStop(1, templateData.colors[1]);
-          ctx.fillStyle = gradient;
-        } else if (templateData.type === "solid" || templateData.type === "neon" || templateData.type === "minimal" || templateData.type === "frame" || templateData.type === "cta-focused") {
-          ctx.fillStyle = templateData.backgroundColor;
-        } else if (templateData.type === "arrows" || templateData.type === "pulse") {
-          ctx.fillStyle = templateData.backgroundColor;
-        }
-
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         let safeArea;
         try {
           safeArea = JSON.parse(frame.safeArea);
         } catch (e) {
           console.error("Failed to parse safe area:", e);
-          safeArea = {
-            qr: { x: 340, y: 760, size: 400 },
-            cta: { x: 100, y: 1400, width: 880, height: 120 }
-          };
-        }
-
-        if (!safeArea.qr || !safeArea.cta) {
-          console.error("Invalid safe area structure");
           return;
         }
+
+        if (!templateData.overlay || !safeArea.qr || !safeArea.cta) {
+          console.error("Invalid template structure");
+          return;
+        }
+
+        const overlay = templateData.overlay;
+        const effectiveBorderRadius = borderRadius >= 0 ? borderRadius : overlay.borderRadius;
+        
+        ctx.save();
+        
+        if (effectiveBorderRadius > 0) {
+          ctx.beginPath();
+          ctx.roundRect(overlay.x, overlay.y, overlay.width, overlay.height, effectiveBorderRadius);
+          ctx.fillStyle = overlay.backgroundColor;
+          ctx.fill();
+        } else {
+          ctx.fillStyle = overlay.backgroundColor;
+          ctx.fillRect(overlay.x, overlay.y, overlay.width, overlay.height);
+        }
+        
+        ctx.restore();
 
         const qrImage = new Image();
         await new Promise((resolve) => {
@@ -115,28 +135,22 @@ export default function OverlayGeneratorPage() {
         ctx.drawImage(qrImage, safeArea.qr.x, safeArea.qr.y, safeArea.qr.size, safeArea.qr.size);
 
         if (ctaText && safeArea.cta) {
-          ctx.fillStyle = "#FFFFFF";
-          ctx.strokeStyle = "#000000";
-          ctx.lineWidth = 6;
-          ctx.font = "bold 48px Inter, sans-serif";
-          ctx.textAlign = "center";
-          ctx.strokeText(ctaText, canvas.width / 2, safeArea.cta.y + safeArea.cta.height / 2 + 16);
-          ctx.fillText(ctaText, canvas.width / 2, safeArea.cta.y + safeArea.cta.height / 2 + 16);
-        }
-
-        if (templateData.type === "neon" && templateData.glowColor) {
-          ctx.shadowColor = templateData.glowColor;
-          ctx.shadowBlur = 40;
-          ctx.strokeStyle = templateData.glowColor;
-          ctx.lineWidth = 8;
-          ctx.strokeRect(safeArea.qr.x - 10, safeArea.qr.y - 10, safeArea.qr.size + 20, safeArea.qr.size + 20);
-          ctx.shadowBlur = 0;
-        }
-
-        if (templateData.type === "frame" || (templateData.type === "solid" && templateData.overlay === "bold-border")) {
-          ctx.strokeStyle = templateData.borderColor || "#8B5CF6";
-          ctx.lineWidth = templateData.borderWidth || 8;
-          ctx.strokeRect(safeArea.qr.x - 20, safeArea.qr.y - 20, safeArea.qr.size + 40, safeArea.qr.size + 40);
+          const textColor = overlay.backgroundColor.includes("rgba(255") || overlay.backgroundColor.includes("rgba(139") ? "#000000" : "#FFFFFF";
+          const strokeColor = textColor === "#FFFFFF" ? "#000000" : "#FFFFFF";
+          
+          ctx.fillStyle = textColor;
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 4;
+          ctx.font = "bold 42px Inter, sans-serif";
+          ctx.textAlign = safeArea.cta.align || "center";
+          
+          const textX = safeArea.cta.align === "left" ? safeArea.cta.x + 20 : 
+                       safeArea.cta.align === "right" ? safeArea.cta.x + safeArea.cta.width - 20 :
+                       safeArea.cta.x + safeArea.cta.width / 2;
+          const textY = safeArea.cta.y + safeArea.cta.height / 2 + 14;
+          
+          ctx.strokeText(ctaText, textX, textY);
+          ctx.fillText(ctaText, textX, textY);
         }
 
         setPreviewUrl(canvas.toDataURL("image/png"));
@@ -146,7 +160,7 @@ export default function OverlayGeneratorPage() {
     };
 
     generatePreview();
-  }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, scans, templates]);
+  }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates]);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-4">
@@ -294,6 +308,40 @@ export default function OverlayGeneratorPage() {
                   <p className="text-xs text-muted-foreground">
                     Keep it short and actionable (max 120 characters)
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Square className="w-5 h-5" />
+                  Style Customization
+                </CardTitle>
+                <CardDescription>
+                  Customize the overlay appearance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="border-radius">Border Radius</Label>
+                      <span className="text-sm text-muted-foreground">{borderRadius}px</span>
+                    </div>
+                    <Slider
+                      id="border-radius"
+                      min={0}
+                      max={50}
+                      step={1}
+                      value={[borderRadius]}
+                      onValueChange={(value) => setBorderRadius(value[0])}
+                      data-testid="slider-border-radius"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      0 = square edges, 50 = maximum rounding
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
