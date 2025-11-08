@@ -61,12 +61,18 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 
 **Feature Specifications:**
 - **Authentication**: Email/password via Passport.js, session-based with protected routes.
-- **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG, storage, and history. Editable destinations for paid plans.
+- **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG/GIF (animated), storage, and history. Editable destinations for paid plans.
 - **Subscription Model**: 4 tiers (Free, Starter, Pro, Unlimited) with feature-based limits enforced by the backend, integrated with Stripe checkout and dynamic updates.
 - **Campaigns & A/B Testing**: CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
-- **Advanced Analytics**: Tracking of device types, social media sources, OS, browser, and time-series scan data for virality.
-- **Download Functionality**: Download QR codes as PNGs from creator page, dashboard, and edit modals, including the "Made with QR Social" watermark.
-- **Animated GIF Support**: Upload animated GIFs as QR code backgrounds with real-time preview using the `gifler` library, which renders each GIF frame with QR overlay on a canvas element. Static PNG download captures the current frame (future: animated GIF/video export via FFmpeg).
+- **Advanced Analytics**: 
+  - **Campaign Analytics**: Comprehensive tracking for campaigns including device types, social media sources, OS/browser breakdown, and time-series data.
+  - **Individual QR Analytics**: Each QR code displays real-time scan metrics on the dashboard including total scans, top traffic platform, device breakdown, OS data, and time-series trends via `/api/scans/:scanId/analytics` endpoint.
+  - Detailed scan event logging with privacy-friendly IP hashing and user agent parsing (UAParser).
+- **Download Functionality**: Download QR codes as static PNGs or animated GIFs from creator page, dashboard, and edit modals, including the "Made with QR Social" watermark.
+- **Animated GIF Support**: 
+  - Upload animated GIFs as QR code backgrounds with real-time preview using DOM layering (img tag + transparent QR overlay).
+  - Backend FFmpeg processing overlays transparent QR code on each frame of animated GIF for download.
+  - Supports image fit modes (cover/contain/stretch) with proper frame scaling.
 
 ## External Dependencies
 
