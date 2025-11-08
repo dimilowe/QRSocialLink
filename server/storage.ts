@@ -97,6 +97,7 @@ export interface IStorage {
   
   createScanEvent(event: InsertScanEvent): Promise<ScanEvent>;
   getCampaignEvents(campaignId: string, limit?: number): Promise<ScanEvent[]>;
+  getScanEvents(scanId: string, limit?: number): Promise<ScanEvent[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -498,6 +499,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(scanEvents)
       .where(eq(scanEvents.campaignId, campaignId))
+      .orderBy(desc(scanEvents.timestamp))
+      .limit(limit);
+  }
+
+  async getScanEvents(scanId: string, limit: number = 1000): Promise<ScanEvent[]> {
+    return await db
+      .select()
+      .from(scanEvents)
+      .where(eq(scanEvents.scanId, scanId))
       .orderBy(desc(scanEvents.timestamp))
       .limit(limit);
   }

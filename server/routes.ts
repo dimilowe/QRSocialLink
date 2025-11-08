@@ -719,6 +719,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/scans/:scanId/analytics", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const scan = await storage.getScan(req.params.scanId);
+      if (!scan || scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const events = await storage.getScanEvents(req.params.scanId);
+      
+      const deviceBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const device = event.deviceType || 'unknown';
+        acc[device] = (acc[device] || 0) + 1;
+        return acc;
+      }, {});
+
+      const platformBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const platform = event.platform || 'Direct/Unknown';
+        acc[platform] = (acc[platform] || 0) + 1;
+        return acc;
+      }, {});
+
+      const osBreakdown = events.reduce((acc: Record<string, number>, event) => {
+        const os = event.os || 'Unknown';
+        acc[os] = (acc[os] || 0) + 1;
+        return acc;
+      }, {});
+
+      const timeSeriesData = events.reduce((acc: Record<string, number>, event) => {
+        const date = new Date(event.timestamp).toISOString().split('T')[0];
+        acc[date] = (acc[date] || 0) + 1;
+        return acc;
+      }, {});
+
+      const sortedTimeSeries = Object.entries(timeSeriesData)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({ date, scans: count }));
+
+      res.json({
+        totalScans: events.length,
+        devices: deviceBreakdown,
+        platforms: platformBreakdown,
+        operatingSystems: osBreakdown,
+        timeSeries: sortedTimeSeries,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/webhooks/stripe", async (req, res) => {
     const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
