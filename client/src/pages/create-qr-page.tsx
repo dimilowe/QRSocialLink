@@ -18,8 +18,10 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, AlertCircle, Download } from "lucide-react";
+import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon } from "lucide-react";
 import { insertScanSchema } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const createQRFormSchema = insertScanSchema
   .pick({ decodedUrl: true, title: true })
@@ -43,6 +45,8 @@ export default function CreateQRPage() {
   const [enableBranding, setEnableBranding] = useState(true);
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
 
   const form = useForm<CreateQRFormData>({
     resolver: zodResolver(createQRFormSchema),
@@ -53,6 +57,30 @@ export default function CreateQRPage() {
   });
 
   const url = form.watch("decodedUrl");
+
+  const handleBackgroundImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file",
+        description: "Please upload an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBackgroundImage(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeBackgroundImage = () => {
+    setBackgroundImage(null);
+  };
 
   useEffect(() => {
     if (!url) {
@@ -74,7 +102,7 @@ export default function CreateQRPage() {
           margin: 1,
         });
 
-        if (!enableBranding) {
+        if (!enableBranding && !backgroundImage) {
           setQrImageUrl(qrDataUrl);
           setIsGenerating(false);
           return;
@@ -89,37 +117,98 @@ export default function CreateQRPage() {
         canvas.width = qrSize + borderSize * 2;
         canvas.height = qrSize + borderSize * 2;
 
-        ctx.fillStyle = borderColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const drawQRContent = () => {
+          if (backgroundImage) {
+            const bgImg = new Image();
+            bgImg.onload = () => {
+              if (imageFit === "cover") {
+                const aspectRatio = bgImg.width / bgImg.height;
+                const canvasAspectRatio = canvas.width / canvas.height;
+                let drawWidth, drawHeight, offsetX, offsetY;
 
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
+                if (aspectRatio > canvasAspectRatio) {
+                  drawHeight = canvas.height;
+                  drawWidth = drawHeight * aspectRatio;
+                  offsetX = (canvas.width - drawWidth) / 2;
+                  offsetY = 0;
+                } else {
+                  drawWidth = canvas.width;
+                  drawHeight = drawWidth / aspectRatio;
+                  offsetX = 0;
+                  offsetY = (canvas.height - drawHeight) / 2;
+                }
+                ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
+              } else if (imageFit === "contain") {
+                const aspectRatio = bgImg.width / bgImg.height;
+                const canvasAspectRatio = canvas.width / canvas.height;
+                let drawWidth, drawHeight, offsetX, offsetY;
 
-          if (topText) {
-            ctx.fillStyle = "#FFFFFF";
-            ctx.font = "bold 24px Inter, sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(topText, canvas.width / 2, 35);
+                if (aspectRatio > canvasAspectRatio) {
+                  drawWidth = canvas.width;
+                  drawHeight = drawWidth / aspectRatio;
+                  offsetX = 0;
+                  offsetY = (canvas.height - drawHeight) / 2;
+                } else {
+                  drawHeight = canvas.height;
+                  drawWidth = drawHeight * aspectRatio;
+                  offsetX = (canvas.width - drawWidth) / 2;
+                  offsetY = 0;
+                }
+                ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
+              } else {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+              }
+
+              finishQR();
+            };
+            bgImg.src = backgroundImage;
+          } else {
+            ctx.fillStyle = borderColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            finishQR();
           }
-
-          if (bottomText) {
-            ctx.fillStyle = "#FFFFFF";
-            ctx.font = "16px Inter, sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(bottomText, canvas.width / 2, canvas.height - 25);
-          }
-
-          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-          ctx.font = "10px Inter, sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
-
-          const brandedDataUrl = canvas.toDataURL("image/png");
-          setQrImageUrl(brandedDataUrl);
-          setIsGenerating(false);
         };
-        img.src = qrDataUrl;
+
+        const finishQR = () => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, borderSize, borderSize, qrSize, qrSize);
+
+            if (enableBranding) {
+              if (topText) {
+                ctx.fillStyle = "#FFFFFF";
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.font = "bold 24px Inter, sans-serif";
+                ctx.textAlign = "center";
+                ctx.strokeText(topText, canvas.width / 2, 35);
+                ctx.fillText(topText, canvas.width / 2, 35);
+              }
+
+              if (bottomText) {
+                ctx.fillStyle = "#FFFFFF";
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.font = "16px Inter, sans-serif";
+                ctx.textAlign = "center";
+                ctx.strokeText(bottomText, canvas.width / 2, canvas.height - 25);
+                ctx.fillText(bottomText, canvas.width / 2, canvas.height - 25);
+              }
+            }
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+            ctx.font = "10px Inter, sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
+
+            const brandedDataUrl = canvas.toDataURL("image/png");
+            setQrImageUrl(brandedDataUrl);
+            setIsGenerating(false);
+          };
+          img.src = qrDataUrl;
+        };
+
+        drawQRContent();
       } catch (err) {
         console.error("QR generation error:", err);
         setIsGenerating(false);
@@ -128,7 +217,7 @@ export default function CreateQRPage() {
 
     const debounce = setTimeout(generateQR, 300);
     return () => clearTimeout(debounce);
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -261,91 +350,168 @@ export default function CreateQRPage() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <FormLabel htmlFor="foreground">Foreground</FormLabel>
-                      <div className="flex gap-2">
-                        <input
-                          id="foreground"
-                          type="color"
-                          value={foregroundColor}
-                          onChange={(e) => setForegroundColor(e.target.value)}
-                          className="h-10 w-full rounded-md border cursor-pointer"
-                          data-testid="input-foreground-color"
-                        />
-                      </div>
-                    </div>
+                  <Tabs defaultValue="qr" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="qr" data-testid="tab-qr-settings">QR Code</TabsTrigger>
+                      <TabsTrigger value="background" data-testid="tab-background-settings">Background</TabsTrigger>
+                    </TabsList>
 
-                    <div className="space-y-2">
-                      <FormLabel htmlFor="background">Background</FormLabel>
-                      <div className="flex gap-2">
-                        <input
-                          id="background"
-                          type="color"
-                          value={backgroundColor}
-                          onChange={(e) => setBackgroundColor(e.target.value)}
-                          className="h-10 w-full rounded-md border cursor-pointer"
-                          data-testid="input-background-color"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    <TabsContent value="qr" className="space-y-4 mt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <FormLabel htmlFor="foreground">Foreground</FormLabel>
+                          <div className="flex gap-2">
+                            <input
+                              id="foreground"
+                              type="color"
+                              value={foregroundColor}
+                              onChange={(e) => setForegroundColor(e.target.value)}
+                              className="h-10 w-full rounded-md border cursor-pointer"
+                              data-testid="input-foreground-color"
+                            />
+                          </div>
+                        </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="enable-branding"
-                        type="checkbox"
-                        checked={enableBranding}
-                        onChange={(e) => setEnableBranding(e.target.checked)}
-                        className="h-4 w-4 rounded border cursor-pointer"
-                        data-testid="checkbox-enable-branding"
-                      />
-                      <FormLabel htmlFor="enable-branding" className="cursor-pointer mb-0">
-                        Add custom branding
-                      </FormLabel>
-                    </div>
-                  </div>
-
-                  {enableBranding && (
-                    <div className="space-y-4 p-4 border rounded-md bg-muted/30">
-                      <div className="space-y-2">
-                        <FormLabel htmlFor="top-text">Top Text</FormLabel>
-                        <Input
-                          id="top-text"
-                          value={topText}
-                          onChange={(e) => setTopText(e.target.value)}
-                          placeholder="qrsocial.com"
-                          maxLength={30}
-                          data-testid="input-top-text"
-                        />
+                        <div className="space-y-2">
+                          <FormLabel htmlFor="background">Background</FormLabel>
+                          <div className="flex gap-2">
+                            <input
+                              id="background"
+                              type="color"
+                              value={backgroundColor}
+                              onChange={(e) => setBackgroundColor(e.target.value)}
+                              className="h-10 w-full rounded-md border cursor-pointer"
+                              data-testid="input-background-color"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
-                        <FormLabel htmlFor="bottom-text">Bottom Text</FormLabel>
-                        <Input
-                          id="bottom-text"
-                          value={bottomText}
-                          onChange={(e) => setBottomText(e.target.value)}
-                          placeholder="long-press to open"
-                          maxLength={30}
-                          data-testid="input-bottom-text"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="enable-branding"
+                            type="checkbox"
+                            checked={enableBranding}
+                            onChange={(e) => setEnableBranding(e.target.checked)}
+                            className="h-4 w-4 rounded border cursor-pointer"
+                            data-testid="checkbox-enable-branding"
+                          />
+                          <FormLabel htmlFor="enable-branding" className="cursor-pointer mb-0">
+                            Add custom branding
+                          </FormLabel>
+                        </div>
                       </div>
 
+                      {enableBranding && (
+                        <div className="space-y-4 p-4 border rounded-md bg-muted/30">
+                          <div className="space-y-2">
+                            <FormLabel htmlFor="top-text">Top Text</FormLabel>
+                            <Input
+                              id="top-text"
+                              value={topText}
+                              onChange={(e) => setTopText(e.target.value)}
+                              placeholder="qrsocial.com"
+                              maxLength={30}
+                              data-testid="input-top-text"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <FormLabel htmlFor="bottom-text">Bottom Text</FormLabel>
+                            <Input
+                              id="bottom-text"
+                              value={bottomText}
+                              onChange={(e) => setBottomText(e.target.value)}
+                              placeholder="long-press to open"
+                              maxLength={30}
+                              data-testid="input-bottom-text"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="background" className="space-y-4 mt-4">
                       <div className="space-y-2">
-                        <FormLabel htmlFor="border-color">Border Color</FormLabel>
-                        <input
-                          id="border-color"
-                          type="color"
-                          value={borderColor}
-                          onChange={(e) => setBorderColor(e.target.value)}
-                          className="h-10 w-full rounded-md border cursor-pointer"
-                          data-testid="input-border-color"
-                        />
+                        <FormLabel>Background Image</FormLabel>
+                        {backgroundImage ? (
+                          <div className="space-y-2">
+                            <div className="relative w-full h-32 bg-muted rounded-md overflow-hidden">
+                              <img
+                                src={backgroundImage}
+                                alt="Background preview"
+                                className="w-full h-full object-cover"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-2 right-2"
+                                onClick={removeBackgroundImage}
+                                data-testid="button-remove-background"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              <FormLabel htmlFor="image-fit">Image Fit</FormLabel>
+                              <Select value={imageFit} onValueChange={(value: "cover" | "contain" | "stretch") => setImageFit(value)}>
+                                <SelectTrigger data-testid="select-image-fit">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cover">Cover (fill frame)</SelectItem>
+                                  <SelectItem value="contain">Contain (fit inside)</SelectItem>
+                                  <SelectItem value="stretch">Stretch (may distort)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                {imageFit === "cover" && "Image fills the entire frame, may crop edges"}
+                                {imageFit === "contain" && "Image fits inside frame, may show borders"}
+                                {imageFit === "stretch" && "Image stretches to fill frame, may distort"}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="border-2 border-dashed rounded-md p-6 text-center hover-elevate cursor-pointer">
+                            <input
+                              type="file"
+                              id="background-upload"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={handleBackgroundImageUpload}
+                              data-testid="input-background-image"
+                            />
+                            <label htmlFor="background-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                              <Upload className="h-8 w-8 text-muted-foreground" />
+                              <p className="text-sm font-medium">Upload Background Image</p>
+                              <p className="text-xs text-muted-foreground">
+                                Click to upload an image for the QR code background
+                              </p>
+                            </label>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+
+                      {!backgroundImage && (
+                        <div className="space-y-2">
+                          <FormLabel htmlFor="border-color">Border Color</FormLabel>
+                          <input
+                            id="border-color"
+                            type="color"
+                            value={borderColor}
+                            onChange={(e) => setBorderColor(e.target.value)}
+                            className="h-10 w-full rounded-md border cursor-pointer"
+                            data-testid="input-border-color"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Border color is used when no background image is uploaded
+                          </p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
                 </div>
 
                 <Button
@@ -355,7 +521,7 @@ export default function CreateQRPage() {
                   data-testid="button-create-qr"
                 >
                   <Sparkles className="h-5 w-5 mr-2" />
-                  {createQRMutation.isPending ? "Creating..." : "Create & Post to Feed"}
+                  {createQRMutation.isPending ? "Creating..." : "Create QR Code"}
                 </Button>
               </form>
             </Form>
