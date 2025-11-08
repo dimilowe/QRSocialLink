@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon, Square, Circle, Star, Heart, Diamond } from "lucide-react";
 import { insertScanSchema } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,6 +49,8 @@ export default function CreateQRPage() {
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundImageType, setBackgroundImageType] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
+  const [borderShape, setBorderShape] = useState<"square" | "circle" | "star" | "polaroid" | "diamond" | "heart">("square");
+  const [polaroidText, setPolaroidText] = useState("");
   const [giflerInstance, setGiflerInstance] = useState<any>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -92,6 +94,91 @@ export default function CreateQRPage() {
     setBackgroundImageType(null);
   };
 
+  const getShapeDimensions = (shape: typeof borderShape) => {
+    const borderSize = 60;
+    const qrSize = 400;
+    
+    if (shape === "polaroid") {
+      return {
+        width: qrSize + borderSize * 2,
+        height: qrSize + borderSize * 2 + 100,
+        qrX: borderSize,
+        qrY: borderSize,
+        qrSize,
+        borderSize,
+      };
+    }
+    
+    return {
+      width: qrSize + borderSize * 2,
+      height: qrSize + borderSize * 2,
+      qrX: borderSize,
+      qrY: borderSize,
+      qrSize,
+      borderSize,
+    };
+  };
+
+  const createShapePath = (ctx: CanvasRenderingContext2D, shape: typeof borderShape, width: number, height: number) => {
+    ctx.beginPath();
+    
+    const centerX = width / 2;
+    const centerY = shape === "polaroid" ? (height - 100) / 2 : height / 2;
+    
+    switch (shape) {
+      case "circle":
+        const radius = Math.min(width, height) / 2;
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        break;
+        
+      case "star":
+        const outerRadius = Math.min(width, height) / 2;
+        const innerRadius = outerRadius * 0.4;
+        const spikes = 5;
+        
+        for (let i = 0; i < spikes * 2; i++) {
+          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const angle = (Math.PI * i) / spikes - Math.PI / 2;
+          const x = centerX + Math.cos(angle) * radius;
+          const y = centerY + Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        break;
+        
+      case "heart":
+        const heartSize = Math.min(width, height) / 2.2;
+        const topY = centerY - heartSize * 0.3;
+        
+        ctx.moveTo(centerX, topY + heartSize);
+        ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
+        ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
+        ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
+        ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
+        ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
+        ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
+        ctx.closePath();
+        break;
+        
+      case "diamond":
+        const halfWidth = width / 2;
+        const halfHeight = height / 2;
+        ctx.moveTo(centerX, centerY - halfHeight);
+        ctx.lineTo(centerX + halfWidth, centerY);
+        ctx.lineTo(centerX, centerY + halfHeight);
+        ctx.lineTo(centerX - halfWidth, centerY);
+        ctx.closePath();
+        break;
+        
+      case "polaroid":
+      case "square":
+      default:
+        ctx.rect(0, 0, width, shape === "polaroid" ? height - 100 : height);
+        break;
+    }
+  };
+
   useEffect(() => {
     if (!url) {
       setQrImageUrl("");
@@ -105,24 +192,26 @@ export default function CreateQRPage() {
       try {
         const QRCode = (await import("qrcode")).default;
         
+        const useTransparentBg = borderShape !== "square" && borderShape !== "polaroid";
+        
         const qrDataUrl = await QRCode.toDataURL(url, {
           color: {
             dark: foregroundColor,
-            light: backgroundColor,
+            light: useTransparentBg ? "#00000000" : backgroundColor,
           },
           width: 400,
           margin: 1,
         });
 
-        if (!enableBranding && !backgroundImage) {
+        if (!enableBranding && !backgroundImage && borderShape === "square") {
           setQrImageUrl(qrDataUrl);
           setIsGenerating(false);
           return;
         }
 
-        const borderSize = 60;
-        const qrSize = 400;
-        const totalSize = qrSize + borderSize * 2;
+        const dims = getShapeDimensions(borderShape);
+        const { width: totalWidth, height: totalHeight, qrX, qrY, qrSize, borderSize } = dims;
+        const totalSize = totalWidth;
 
         const drawImageOnCanvas = (ctx: CanvasRenderingContext2D, image: HTMLImageElement | ImageBitmap, imgWidth: number, imgHeight: number, canvasWidth: number, canvasHeight: number) => {
           if (imageFit === "cover") {
@@ -171,9 +260,11 @@ export default function CreateQRPage() {
         });
 
         const drawQROverlay = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
-          ctx.drawImage(qrImage, borderSize, borderSize, qrSize, qrSize);
+          ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
-          if (enableBranding) {
+          const isPolaroid = borderShape === "polaroid";
+
+          if (enableBranding && !isPolaroid) {
             if (topText) {
               ctx.fillStyle = "#FFFFFF";
               ctx.strokeStyle = "#000000";
@@ -190,15 +281,24 @@ export default function CreateQRPage() {
               ctx.lineWidth = 3;
               ctx.font = "16px Inter, sans-serif";
               ctx.textAlign = "center";
-              ctx.strokeText(bottomText, canvasWidth / 2, canvasHeight - 25);
-              ctx.fillText(bottomText, canvasWidth / 2, canvasHeight - 25);
+              const bottomY = isPolaroid ? canvasHeight - 125 : canvasHeight - 25;
+              ctx.strokeText(bottomText, canvasWidth / 2, bottomY);
+              ctx.fillText(bottomText, canvasWidth / 2, bottomY);
             }
           }
 
+          if (isPolaroid && polaroidText) {
+            ctx.fillStyle = "#000000";
+            ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(polaroidText, canvasWidth / 2, canvasHeight - 50);
+          }
+
+          const watermarkY = isPolaroid ? canvasHeight - 10 : canvasHeight - 10;
           ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
           ctx.font = "10px Inter, sans-serif";
           ctx.textAlign = "right";
-          ctx.fillText("Made with QR Social", canvasWidth - 10, canvasHeight - 10);
+          ctx.fillText("Made with QR Social", canvasWidth - 10, watermarkY);
         };
 
         if (backgroundImage && backgroundImageType === "image/gif") {
@@ -207,11 +307,11 @@ export default function CreateQRPage() {
           const overlayCtx = overlayCanvas.getContext("2d");
           if (!overlayCtx) throw new Error("Canvas not supported");
 
-          overlayCanvas.width = totalSize;
-          overlayCanvas.height = totalSize;
+          overlayCanvas.width = totalWidth;
+          overlayCanvas.height = totalHeight;
 
           // Draw QR code and branding on transparent background
-          drawQROverlay(overlayCtx, totalSize, totalSize);
+          drawQROverlay(overlayCtx, totalWidth, totalHeight);
 
           const transparentQRUrl = overlayCanvas.toDataURL("image/png");
           setQrOverlayUrl(transparentQRUrl);
@@ -221,13 +321,21 @@ export default function CreateQRPage() {
           const compositeCtx = compositeCanvas.getContext("2d");
           if (!compositeCtx) throw new Error("Canvas not supported");
 
-          compositeCanvas.width = totalSize;
-          compositeCanvas.height = totalSize;
+          compositeCanvas.width = totalWidth;
+          compositeCanvas.height = totalHeight;
 
           const bgImg = new Image();
           bgImg.onload = () => {
             compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            compositeCtx.fillStyle = "#FFFFFF";
+            compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            
+            compositeCtx.save();
+            createShapePath(compositeCtx, borderShape, compositeCanvas.width, compositeCanvas.height);
+            compositeCtx.clip();
             drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, compositeCanvas.width, compositeCanvas.height);
+            compositeCtx.restore();
+            
             drawQROverlay(compositeCtx, compositeCanvas.width, compositeCanvas.height);
 
             const compositeDataUrl = compositeCanvas.toDataURL("image/png");
@@ -240,13 +348,21 @@ export default function CreateQRPage() {
           const ctx = canvas.getContext("2d");
           if (!ctx) throw new Error("Canvas not supported");
 
-          canvas.width = totalSize;
-          canvas.height = totalSize;
+          canvas.width = totalWidth;
+          canvas.height = totalHeight;
 
           const bgImg = new Image();
           bgImg.onload = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            createShapePath(ctx, borderShape, canvas.width, canvas.height);
+            ctx.clip();
             drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, canvas.width, canvas.height);
+            ctx.restore();
+            
             drawQROverlay(ctx, canvas.width, canvas.height);
 
             const brandedDataUrl = canvas.toDataURL("image/png");
@@ -259,11 +375,19 @@ export default function CreateQRPage() {
           const ctx = canvas.getContext("2d");
           if (!ctx) throw new Error("Canvas not supported");
 
-          canvas.width = totalSize;
-          canvas.height = totalSize;
+          canvas.width = totalWidth;
+          canvas.height = totalHeight;
 
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          ctx.save();
+          createShapePath(ctx, borderShape, canvas.width, canvas.height);
+          ctx.clip();
           ctx.fillStyle = borderColor;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.restore();
+          
           drawQROverlay(ctx, canvas.width, canvas.height);
 
           const brandedDataUrl = canvas.toDataURL("image/png");
@@ -286,7 +410,7 @@ export default function CreateQRPage() {
         giflerInstance.stop();
       }
     };
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, borderShape, polaroidText]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -505,6 +629,41 @@ export default function CreateQRPage() {
                       </div>
 
                       <div className="space-y-2">
+                        <FormLabel>Border Shape</FormLabel>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { value: "square", icon: Square, label: "Square" },
+                            { value: "circle", icon: Circle, label: "Circle" },
+                            { value: "star", icon: Star, label: "Star" },
+                            { value: "heart", icon: Heart, label: "Heart" },
+                            { value: "diamond", icon: Diamond, label: "Diamond" },
+                            { value: "polaroid", icon: ImageIcon, label: "Polaroid" },
+                          ].map((shape) => {
+                            const Icon = shape.icon;
+                            return (
+                              <button
+                                key={shape.value}
+                                type="button"
+                                onClick={() => setBorderShape(shape.value as typeof borderShape)}
+                                className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-all hover-elevate ${
+                                  borderShape === shape.value
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border"
+                                }`}
+                                data-testid={`button-shape-${shape.value}`}
+                              >
+                                <Icon className="w-5 h-5" />
+                                <span className="text-xs font-medium">{shape.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Choose a creative border shape for your QR code
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <input
                             id="enable-branding"
@@ -519,6 +678,23 @@ export default function CreateQRPage() {
                           </FormLabel>
                         </div>
                       </div>
+
+                      {borderShape === "polaroid" && (
+                        <div className="space-y-2 p-4 border rounded-md bg-muted/30">
+                          <FormLabel htmlFor="polaroid-text">Polaroid Caption</FormLabel>
+                          <Input
+                            id="polaroid-text"
+                            value={polaroidText}
+                            onChange={(e) => setPolaroidText(e.target.value)}
+                            placeholder="Your caption here..."
+                            maxLength={50}
+                            data-testid="input-polaroid-text"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Add a custom caption in the Polaroid-style bottom strip
+                          </p>
+                        </div>
+                      )}
 
                       {enableBranding && (
                         <div className="space-y-4 p-4 border rounded-md bg-muted/30">
