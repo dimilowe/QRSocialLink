@@ -7,6 +7,13 @@ import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDest
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
+import fs from "fs/promises";
+import path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
+import os from "os";
+
+const execAsync = promisify(exec);
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
@@ -927,6 +934,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       return res.status(400).send({ error: { message: error.message } });
+    }
+  });
+
+  app.post("/api/generate-animated-qr", async (req, res) => {
+    try {
+      const { backgroundImageData, qrCodeData, imageFit } = req.body;
+
+      if (!backgroundImageData || !qrCodeData) {
+        return res.status(400).json({ message: "Missing required data" });
+      }
+
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'qr-'));
+      const backgroundPath = path.join(tempDir, 'background.gif');
+      const qrPath = path.join(tempDir, 'qr.png');
+      const outputPath = path.join(tempDir, 'output.gif');
+
+      const backgroundBuffer = Buffer.from(backgroundImageData.split(',')[1], 'base64');
+      await fs.writeFile(backgroundPath, backgroundBuffer);
+
+      const qrBuffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
+      await fs.writeFile(qrPath, qrBuffer);
+
+      let filterComplex = '';
+      if (imageFit === 'cover') {
+        filterComplex = '[0:v]scale=400:400:force_original_aspect_ratio=increase,crop=400:400[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+      } else if (imageFit === 'contain') {
+        filterComplex = '[0:v]scale=400:400:force_original_aspect_ratio=decrease,pad=400:400:(ow-iw)/2:(oh-ih)/2:white[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+      } else {
+        filterComplex = '[0:v]scale=400:400[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+      }
+
+      const ffmpegCommand = `ffmpeg -i "${backgroundPath}" -i "${qrPath}" -filter_complex "${filterComplex}" -y "${outputPath}"`;
+      
+      await execAsync(ffmpegCommand);
+
+      const outputBuffer = await fs.readFile(outputPath);
+      const base64Output = outputBuffer.toString('base64');
+
+      await fs.rm(tempDir, { recursive: true, force: true });
+
+      res.json({ 
+        animatedQrCode: `data:image/gif;base64,${base64Output}` 
+      });
+    } catch (error: any) {
+      console.error('FFmpeg error:', error);
+      res.status(500).json({ message: error.message || "Failed to generate animated QR code" });
     }
   });
 
