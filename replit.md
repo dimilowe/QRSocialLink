@@ -52,7 +52,7 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 - **Frontend**: React, TypeScript, Tailwind CSS, Wouter (routing), TanStack Query, Shadcn UI.
 - **Backend**: Express.js, Node.js, Passport.js (authentication).
 - **Database ORM**: Drizzle ORM.
-- **QR Code Handling**: `html5-qrcode` for camera scanning, `jsqr` for image upload, `qrcode` for generation.
+- **QR Code Handling**: `html5-qrcode` for camera scanning, `jsqr` for image upload, `qrcode` for generation, `gifler` for animated GIF backgrounds.
 - **A/B Testing**: Implemented with `WeightedRandomStrategy` and `EpsilonGreedyStrategy` (multi-armed bandit algorithm).
 - **Analytics**: Detailed scan event logging with privacy-friendly IP hashing, user agent parsing (UAParser) for device, OS, browser, and platform detection.
 - **Subscription Management**: Stripe integration for multi-tier subscriptions with webhook-based plan management.
@@ -61,11 +61,12 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 
 **Feature Specifications:**
 - **Authentication**: Email/password via Passport.js, session-based with protected routes.
-- **QR Code Management**: Custom branded QR code creation with color customization, real-time preview, download as PNG, storage, and history. Editable destinations for paid plans.
+- **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG, storage, and history. Editable destinations for paid plans.
 - **Subscription Model**: 4 tiers (Free, Starter, Pro, Unlimited) with feature-based limits enforced by the backend, integrated with Stripe checkout and dynamic updates.
 - **Campaigns & A/B Testing**: CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
 - **Advanced Analytics**: Tracking of device types, social media sources, OS, browser, and time-series scan data for virality.
 - **Download Functionality**: Download QR codes as PNGs from creator page, dashboard, and edit modals, including the "Made with QR Social" watermark.
+- **Animated GIF Support**: Upload animated GIFs as QR code backgrounds with real-time preview using the `gifler` library, which renders each GIF frame with QR overlay on a canvas element. Static PNG download captures the current frame (future: animated GIF/video export via FFmpeg).
 
 ## External Dependencies
 
