@@ -103,12 +103,24 @@ Implementation:
 
 ### Tables
 - **users**: id, email, username, password, avatarUrl, plan, stripeCustomerId, stripeSubscriptionId
-- **scans**: id, userId, qrImageUrl, decodedUrl, title, type, redirectUrl, isPublic
+- **scans**: id, userId, qrImageUrl, decodedUrl, title, type, redirectUrl, isPublic, campaignId, dynamicSlug
   - `type` field: "scanned" (default) or "created" to distinguish scan vs creation
+  - `campaignId`: optional link to campaign for marketing QRs
+  - `dynamicSlug`: short slug for dynamic redirect URLs
 - **followers**: id, followerId, followedId
 - **likes**: id, userId, scanId
 - **comments**: id, userId, scanId, content
 - **qr_drops**: id, creatorId, qrImageUrl, decodedUrl, title, activeUntil, scanCount, maxScans (future feature)
+- **campaigns**: id, userId, name, slug, abStrategy, status, createdAt, updatedAt
+  - Groups multiple QR codes with shared A/B testing strategy
+- **destinations**: id, campaignId, name, url, weight, impressions, conversions, isActive
+  - A/B test variants with automatic performance tracking
+- **frames**: id, userId, name, fileUrl, safeAreaX, safeAreaY, safeAreaWidth, safeAreaHeight, aspectRatio
+  - Video/image overlays with defined safe areas for QR placement
+- **overlayRenditions**: id, userId, scanId, frameId, status, outputUrl, createdAt, completedAt
+  - FFmpeg rendering jobs for QR + frame composites
+- **scanEvents**: id, campaignId, destinationId, scanId, userAgent, ipHash, referrer, country, platform, timestamp
+  - Detailed analytics tracking with privacy-friendly IP hashing
 
 ## API Endpoints
 
@@ -139,6 +151,18 @@ Implementation:
 ### Subscription
 - POST `/api/get-or-create-subscription` - Create or retrieve Stripe subscription
 - POST `/api/webhooks/stripe` - Stripe webhook endpoint for subscription events
+
+### Campaigns & A/B Testing
+- POST `/api/campaigns` - Create new campaign
+- GET `/api/campaigns` - Get user's campaigns
+- GET `/api/campaigns/:id` - Get campaign with destinations and analytics
+- PATCH `/api/campaigns/:id` - Update campaign
+- DELETE `/api/campaigns/:id` - Delete campaign
+- POST `/api/campaigns/:campaignId/destinations` - Add A/B test variant
+- PATCH `/api/destinations/:id` - Update destination
+- DELETE `/api/destinations/:id` - Delete destination
+- GET `/r/:slug` - Dynamic redirect with A/B testing (public)
+- POST `/api/events/conversion` - Record conversion event (public)
 
 ## Environment Variables Required
 - `DATABASE_URL` - Neon PostgreSQL connection string
@@ -186,6 +210,19 @@ Implementation:
   - Downloads as PNG files with descriptive filenames (includes title or ID)
   - Uses anchor element with download attribute for cross-browser compatibility
   - All downloaded QR codes include "Made with QR Social" watermark for self-promotion
+- **Campaign Management & A/B Testing Infrastructure** (November 2025):
+  - Extended database with 5 new tables: campaigns, destinations, frames, overlayRenditions, scanEvents
+  - Installed FFmpeg system dependency for future video overlay rendering
+  - Added packages: sharp (image processing), multer (file uploads), nanoid (slug generation)
+  - Implemented Campaign CRUD API with authentication and ownership checks
+  - Built A/B testing service with two strategies:
+    - WeightedRandomStrategy: Distributes traffic by configured weight
+    - EpsilonGreedyStrategy: Multi-armed bandit algorithm for automatic optimization
+  - Dynamic redirect system (/r/:slug) selects A/B variant and tracks impressions
+  - Scan event logging with privacy-friendly IP hashing (salted SHA-256)
+  - Conversion tracking API for measuring A/B test performance
+  - All campaign endpoints enforce authentication and user ownership
+  - Backend ready for frame overlays and advanced analytics UI
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
