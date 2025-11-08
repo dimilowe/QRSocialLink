@@ -60,7 +60,9 @@ function Router() {
         <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
         <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
-        <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
+        <Route path="/subscribe">
+          {() => <ProtectedRoute component={SubscribePage} />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
       {user && <BottomNav />}
