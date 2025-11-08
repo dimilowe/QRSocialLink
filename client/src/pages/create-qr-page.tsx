@@ -341,12 +341,26 @@ export default function CreateQRPage() {
   };
 
   const handleDownloadQR = () => {
-    if (!qrImageUrl) return;
+    let downloadUrl = qrImageUrl;
+
+    if (backgroundImage && backgroundImageType === "image/gif") {
+      const canvas = document.getElementById("qr-preview-canvas") as HTMLCanvasElement;
+      if (canvas) {
+        downloadUrl = canvas.toDataURL("image/png");
+      }
+    }
+
+    if (!downloadUrl) return;
     
     const link = document.createElement("a");
     link.download = `qr-code-${form.watch("title") || "download"}.png`;
-    link.href = qrImageUrl;
+    link.href = downloadUrl;
     link.click();
+
+    toast({
+      title: "QR Code Downloaded",
+      description: "Your QR code has been saved to your device",
+    });
   };
 
   return (
@@ -592,30 +606,35 @@ export default function CreateQRPage() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">Preview</h3>
               
-              {qrImageUrl ? (
+              <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square relative">
+                {backgroundImage && backgroundImageType === "image/gif" ? (
+                  <>
+                    <canvas
+                      id="qr-preview-canvas"
+                      className="max-w-full max-h-full"
+                      data-testid="canvas-qr-preview"
+                    />
+                    <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+                      <ImageIcon className="h-3 w-3" />
+                      Animated GIF
+                    </div>
+                  </>
+                ) : qrImageUrl ? (
+                  <img
+                    src={qrImageUrl}
+                    alt="QR Code Preview"
+                    className="max-w-full max-h-full"
+                    data-testid="img-qr-preview"
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-center">
+                    Enter a URL to see your QR code
+                  </p>
+                )}
+              </div>
+
+              {qrImageUrl && (
                 <div className="space-y-4">
-                  <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square relative">
-                    {backgroundImage && backgroundImageType === "image/gif" ? (
-                      <canvas
-                        id="qr-preview-canvas"
-                        className="max-w-full max-h-full"
-                        data-testid="canvas-qr-preview"
-                      />
-                    ) : (
-                      <img
-                        src={qrImageUrl}
-                        alt="QR Code Preview"
-                        className="max-w-full max-h-full"
-                        data-testid="img-qr-preview"
-                      />
-                    )}
-                    {backgroundImage && backgroundImageType === "image/gif" && (
-                      <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
-                        <ImageIcon className="h-3 w-3" />
-                        Animated GIF
-                      </div>
-                    )}
-                  </div>
                   
                   <Button
                     type="button"
@@ -643,12 +662,6 @@ export default function CreateQRPage() {
                       {url}
                     </p>
                   </div>
-                </div>
-              ) : (
-                <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square">
-                  <p className="text-muted-foreground text-center">
-                    Enter a URL to see your QR code
-                  </p>
                 </div>
               )}
             </div>
