@@ -98,6 +98,16 @@ export interface IStorage {
   createScanEvent(event: InsertScanEvent): Promise<ScanEvent>;
   getCampaignEvents(campaignId: string, limit?: number): Promise<ScanEvent[]>;
   getScanEvents(scanId: string, limit?: number): Promise<ScanEvent[]>;
+  
+  createFrame(frame: InsertFrame): Promise<Frame>;
+  getFrame(id: string): Promise<Frame | undefined>;
+  getFrames(): Promise<Frame[]>;
+  getUserFrames(userId: string): Promise<Frame[]>;
+  
+  createOverlayRendition(rendition: InsertOverlayRendition): Promise<OverlayRendition>;
+  getOverlayRendition(id: string): Promise<OverlayRendition | undefined>;
+  getUserOverlayRenditions(userId: string): Promise<OverlayRendition[]>;
+  updateOverlayRendition(id: string, updates: Partial<OverlayRendition>): Promise<OverlayRendition>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -510,6 +520,68 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scanEvents.scanId, scanId))
       .orderBy(desc(scanEvents.timestamp))
       .limit(limit);
+  }
+
+  async createFrame(insertFrame: InsertFrame): Promise<Frame> {
+    const result = await db.insert(frames).values(insertFrame).returning();
+    return result[0];
+  }
+
+  async getFrame(id: string): Promise<Frame | undefined> {
+    const result = await db.select().from(frames).where(eq(frames.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getFrames(): Promise<Frame[]> {
+    return await db
+      .select()
+      .from(frames)
+      .orderBy(desc(frames.createdAt));
+  }
+
+  async getUserFrames(userId: string): Promise<Frame[]> {
+    return await db
+      .select()
+      .from(frames)
+      .where(eq(frames.userId, userId))
+      .orderBy(desc(frames.createdAt));
+  }
+
+  async createOverlayRendition(insertRendition: InsertOverlayRendition): Promise<OverlayRendition> {
+    const result = await db.insert(overlayRenditions).values(insertRendition).returning();
+    return result[0];
+  }
+
+  async getOverlayRendition(id: string): Promise<OverlayRendition | undefined> {
+    const result = await db
+      .select()
+      .from(overlayRenditions)
+      .where(eq(overlayRenditions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getUserOverlayRenditions(userId: string): Promise<OverlayRendition[]> {
+    const overlays = await db
+      .select({
+        rendition: overlayRenditions,
+        scan: scans,
+      })
+      .from(overlayRenditions)
+      .innerJoin(scans, eq(overlayRenditions.scanId, scans.id))
+      .where(eq(scans.userId, userId))
+      .orderBy(desc(overlayRenditions.createdAt));
+
+    return overlays.map(({ rendition }) => rendition);
+  }
+
+  async updateOverlayRendition(id: string, updates: Partial<OverlayRendition>): Promise<OverlayRendition> {
+    const result = await db
+      .update(overlayRenditions)
+      .set(updates)
+      .where(eq(overlayRenditions.id, id))
+      .returning();
+    return result[0];
   }
 }
 

@@ -1,4 +1,4 @@
-import { QrCode, Home, Plus, LayoutDashboard, BarChart3 } from "lucide-react";
+import { QrCode, Home, Plus, LayoutDashboard, BarChart3, Sparkles } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +16,7 @@ export function TopHeader() {
   const navItems = [
     { icon: Home, label: "Home", path: "/" },
     { icon: Plus, label: "Create QR", path: "/create" },
+    { icon: Sparkles, label: "Overlays", path: "/overlays" },
     { icon: BarChart3, label: "Campaigns", path: "/campaigns" },
     { icon: LayoutDashboard, label: "My QR Codes", path: "/dashboard" },
   ];

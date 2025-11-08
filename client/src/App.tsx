@@ -14,6 +14,7 @@ import CreateQRPage from "@/pages/create-qr-page";
 import DashboardPage from "@/pages/dashboard-page";
 import CampaignsPage from "@/pages/campaigns-page";
 import CampaignDetailPage from "@/pages/campaign-detail-page";
+import OverlayGeneratorPage from "@/pages/overlay-generator-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -56,13 +57,12 @@ function Router() {
         </Route>
         <Route path="/" component={HomePage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
+        <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
         <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
         <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
-        <Route path="/subscribe">
-          {() => <ProtectedRoute component={SubscribePage} />}
-        </Route>
+        <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route>{() => <NotFound />}</Route>
       </Switch>
       {user && <BottomNav />}

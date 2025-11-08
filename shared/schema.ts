@@ -146,6 +146,7 @@ export const overlayRenditions = pgTable("overlay_renditions", {
   status: text("status").notNull().default("queued"),
   outputPath: text("output_path"),
   aspect: text("aspect").notNull(),
+  ctaText: text("cta_text"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -222,11 +223,15 @@ export const insertFrameSchema = createInsertSchema(frames).omit({
   createdAt: true,
 });
 
-export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions).omit({
-  id: true,
-  createdAt: true,
-  completedAt: true,
-});
+export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions)
+  .omit({
+    id: true,
+    createdAt: true,
+    completedAt: true,
+  })
+  .extend({
+    ctaText: z.string().max(120).optional().nullable(),
+  });
 
 export const insertScanEventSchema = createInsertSchema(scanEvents).omit({
   id: true,
@@ -282,3 +287,89 @@ export type CampaignWithStats = Campaign & {
   totalConversions: number;
   destinationCount: number;
 };
+
+// Platform-specific overlay presets with safe zones
+export const PLATFORM_PRESETS = {
+  TIKTOK: {
+    id: "tiktok",
+    name: "TikTok / Shorts / Reels",
+    width: 1080,
+    height: 1920,
+    aspectRatio: "9:16",
+    description: "Vertical video for TikTok, YouTube Shorts, Instagram Reels",
+    safeZone: {
+      top: 131,
+      bottom: 367,
+      left: 120,
+      right: 120,
+    },
+  },
+  YOUTUBE_LONG: {
+    id: "youtube_long",
+    name: "YouTube Long-Form",
+    width: 1920,
+    height: 1080,
+    aspectRatio: "16:9",
+    description: "Horizontal video for YouTube standard videos",
+    safeZone: {
+      top: 108,
+      bottom: 108,
+      left: 192,
+      right: 192,
+    },
+  },
+  INSTAGRAM_FEED: {
+    id: "instagram_feed",
+    name: "Instagram Feed",
+    width: 1080,
+    height: 1350,
+    aspectRatio: "4:5",
+    description: "Instagram feed post optimized dimensions",
+    safeZone: {
+      top: 108,
+      bottom: 135,
+      left: 60,
+      right: 120,
+    },
+  },
+  FACEBOOK_VIDEO: {
+    id: "facebook_video",
+    name: "Facebook Video",
+    width: 1080,
+    height: 1080,
+    aspectRatio: "1:1",
+    description: "Square video for Facebook and Instagram",
+    safeZone: {
+      top: 108,
+      bottom: 108,
+      left: 108,
+      right: 108,
+    },
+  },
+} as const;
+
+export type PlatformPresetId = typeof PLATFORM_PRESETS[keyof typeof PLATFORM_PRESETS]["id"];
+
+// Overlay template positions
+export const OVERLAY_POSITIONS = {
+  TOP_BANNER: "top_banner",
+  BOTTOM_BANNER: "bottom_banner",
+  TOP_THIRD: "top_third",
+  BOTTOM_THIRD: "bottom_third",
+  SIDE_COLUMN: "side_column",
+  CORNER: "corner",
+} as const;
+
+export type OverlayPosition = typeof OVERLAY_POSITIONS[keyof typeof OVERLAY_POSITIONS];
+
+// Overlay template styles
+export const OVERLAY_STYLES = {
+  LUXURY: "luxury",
+  NEON: "neon",
+  MINIMAL: "minimal",
+  FASHION: "fashion",
+  TECH: "tech",
+  GRADIENT: "gradient",
+} as const;
+
+export type OverlayStyle = typeof OVERLAY_STYLES[keyof typeof OVERLAY_STYLES];

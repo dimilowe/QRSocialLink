@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
@@ -1033,6 +1033,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('FFmpeg error:', error);
       res.status(500).json({ message: error.message || "Failed to generate animated QR code" });
+    } finally {
+      if (tempDir) {
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
+      }
+    }
+  });
+
+  app.get("/api/overlay-templates", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const templates = await storage.getFrames();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/overlays", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const overlays = await storage.getUserOverlayRenditions(req.user.id);
+      res.json(overlays);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/overlays/generate", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    let tempDir: string | null = null;
+
+    try {
+      const validatedData = insertOverlayRenditionSchema.parse(req.body);
+
+      const scan = await storage.getScan(validatedData.scanId);
+      if (!scan) {
+        return res.status(404).json({ message: "QR code not found" });
+      }
+
+      if (scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const frame = await storage.getFrame(validatedData.frameId);
+      if (!frame) {
+        return res.status(404).json({ message: "Frame template not found" });
+      }
+
+      const rendition = await storage.createOverlayRendition(validatedData);
+
+      res.json(rendition);
+    } catch (error: any) {
+      console.error('Overlay generation error:', error);
+      res.status(500).json({ message: error.message || "Failed to generate overlay" });
     } finally {
       if (tempDir) {
         try {
