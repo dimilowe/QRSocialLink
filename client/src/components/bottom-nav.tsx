@@ -1,4 +1,4 @@
-import { Home, Plus, Bell, User } from "lucide-react";
+import { Home, Plus, BarChart3, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -21,9 +21,9 @@ export function BottomNav() {
       path: "/create",
     },
     {
-      icon: Bell,
-      label: "Activity",
-      path: "/activity",
+      icon: BarChart3,
+      label: "Campaigns",
+      path: "/campaigns",
     },
     {
       icon: User,

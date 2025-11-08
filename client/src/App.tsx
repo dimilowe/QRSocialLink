@@ -12,6 +12,8 @@ import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
 import CreateQRPage from "@/pages/create-qr-page";
 import DashboardPage from "@/pages/dashboard-page";
+import CampaignsPage from "@/pages/campaigns-page";
+import CampaignDetailPage from "@/pages/campaign-detail-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -52,9 +54,11 @@ function Router() {
             return user ? <Redirect to="/" /> : <AuthPage />;
           }}
         </Route>
-        <Route path="/">{() => <FeedPage />}</Route>
+        <Route path="/" component={FeedPage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
+        <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
+        <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route component={NotFound} />

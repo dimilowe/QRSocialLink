@@ -110,7 +110,8 @@ export const campaigns = pgTable("campaigns", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  abStrategy: text("ab_strategy").notNull().default("epsilon-greedy"),
+  abStrategy: text("ab_strategy").notNull().default("epsilon_greedy"),
+  status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -118,10 +119,12 @@ export const campaigns = pgTable("campaigns", {
 export const destinations = pgTable("destinations", {
   id: uuid("id").primaryKey().defaultRandom(),
   campaignId: uuid("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
   url: text("url").notNull(),
-  weight: integer("weight").notNull().default(1),
+  weight: integer("weight").notNull().default(50),
   impressions: integer("impressions").notNull().default(0),
   conversions: integer("conversions").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
