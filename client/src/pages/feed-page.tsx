@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ScanWithUser } from "@shared/schema";
 import { ScanCard } from "@/components/feed/scan-card";
@@ -19,7 +19,6 @@ export default function FeedPage() {
   const [showProModal, setShowProModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedScan, setSelectedScan] = useState<ScanWithUser | null>(null);
-  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
 
   const { data: feed = [], isLoading } = useQuery<ScanWithUser[]>({
     queryKey: ["/api/feed"],
@@ -31,9 +30,10 @@ export default function FeedPage() {
     enabled: !!user,
   });
 
-  useEffect(() => {
-    setFollowingIds(new Set(followingData.map((f) => f.followedId)));
-  }, [followingData]);
+  const followingIds = useMemo(() => 
+    new Set(followingData.map((f) => f.followedId)),
+    [JSON.stringify(followingData.map(f => f.followedId).sort())]
+  );
 
   const likeMutation = useMutation({
     mutationFn: async (scanId: string) => {
@@ -55,14 +55,7 @@ export default function FeedPage() {
       );
       return { userId, isFollowing, data: await response.json() };
     },
-    onSuccess: ({ userId, isFollowing }) => {
-      const newFollowing = new Set(followingIds);
-      if (isFollowing) {
-        newFollowing.delete(userId);
-      } else {
-        newFollowing.add(userId);
-      }
-      setFollowingIds(newFollowing);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/following"] });
     },
   });
@@ -142,6 +135,25 @@ export default function FeedPage() {
             </Button>
           )}
         </div>
+
+        {!user && (
+          <div className="bg-gradient-to-r from-primary/10 to-purple-600/10 rounded-lg p-6 border border-primary/20">
+            <div className="text-center space-y-3">
+              <h2 className="text-xl font-heading font-bold">Welcome to QR Social</h2>
+              <p className="text-muted-foreground">
+                Scan, create, and share QR codes with the community. Sign up to start creating your own custom branded QR codes!
+              </p>
+              <div className="flex gap-3 justify-center pt-2">
+                <Button variant="default" asChild data-testid="button-cta-signup">
+                  <a href="/auth">Sign Up Free</a>
+                </Button>
+                <Button variant="outline" asChild data-testid="button-cta-login">
+                  <a href="/auth">Log In</a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-4">

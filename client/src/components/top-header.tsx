@@ -59,13 +59,19 @@ export function TopHeader() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           
-          {user && (
+          {user ? (
             <Button variant="ghost" className="hover-elevate rounded-full h-auto p-0" asChild>
               <Link href={`/profile/${user.id}`} data-testid="link-profile">
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={user.avatarUrl || undefined} />
                   <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
                 </Avatar>
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="default" size="sm" asChild data-testid="button-login">
+              <Link href="/auth">
+                Log In
               </Link>
             </Button>
           )}

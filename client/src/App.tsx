@@ -38,7 +38,7 @@ function Router() {
 
   return (
     <>
-      {user && <TopHeader />}
+      <TopHeader />
       <Switch>
         <Route path="/auth">
           {() => {
@@ -52,7 +52,7 @@ function Router() {
             return user ? <Redirect to="/" /> : <AuthPage />;
           }}
         </Route>
-        <Route path="/" component={() => <ProtectedRoute component={FeedPage} />} />
+        <Route path="/">{() => <FeedPage />}</Route>
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
