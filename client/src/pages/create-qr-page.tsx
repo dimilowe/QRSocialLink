@@ -44,6 +44,7 @@ export default function CreateQRPage() {
   const [bottomText, setBottomText] = useState("long-press to open");
   const [enableBranding, setEnableBranding] = useState(true);
   const [qrImageUrl, setQrImageUrl] = useState("");
+  const [qrOverlayUrl, setQrOverlayUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [backgroundImageType, setBackgroundImageType] = useState<string | null>(null);
@@ -201,38 +202,39 @@ export default function CreateQRPage() {
         };
 
         if (backgroundImage && backgroundImageType === "image/gif") {
-          const gifler = (await import("gifler")).default;
-          
-          await new Promise(resolve => setTimeout(resolve, 0));
-          
-          const previewCanvas = canvasRef.current;
-          
-          if (!previewCanvas) {
-            console.error("Preview canvas not found", canvasRef);
+          // For GIF backgrounds, create a transparent QR overlay
+          const overlayCanvas = document.createElement("canvas");
+          const overlayCtx = overlayCanvas.getContext("2d");
+          if (!overlayCtx) throw new Error("Canvas not supported");
+
+          overlayCanvas.width = totalSize;
+          overlayCanvas.height = totalSize;
+
+          // Draw QR code and branding on transparent background
+          drawQROverlay(overlayCtx, totalSize, totalSize);
+
+          const transparentQRUrl = overlayCanvas.toDataURL("image/png");
+          setQrOverlayUrl(transparentQRUrl);
+
+          // Also create a static composite for download
+          const compositeCanvas = document.createElement("canvas");
+          const compositeCtx = compositeCanvas.getContext("2d");
+          if (!compositeCtx) throw new Error("Canvas not supported");
+
+          compositeCanvas.width = totalSize;
+          compositeCanvas.height = totalSize;
+
+          const bgImg = new Image();
+          bgImg.onload = () => {
+            compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, compositeCanvas.width, compositeCanvas.height);
+            drawQROverlay(compositeCtx, compositeCanvas.width, compositeCanvas.height);
+
+            const compositeDataUrl = compositeCanvas.toDataURL("image/png");
+            setQrImageUrl(compositeDataUrl);
             setIsGenerating(false);
-            return;
-          }
-
-          console.log("Canvas found, setting up GIF animation", previewCanvas);
-          previewCanvas.width = totalSize;
-          previewCanvas.height = totalSize;
-
-          let hasSetStaticPreview = false;
-
-          currentGifler = gifler(backgroundImage).frames(previewCanvas, (ctx: CanvasRenderingContext2D, frame: any) => {
-            ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-            drawImageOnCanvas(ctx, frame.buffer, frame.width, frame.height, previewCanvas.width, previewCanvas.height);
-            drawQROverlay(ctx, previewCanvas.width, previewCanvas.height);
-
-            if (!hasSetStaticPreview) {
-              setQrImageUrl(previewCanvas.toDataURL("image/png"));
-              setIsGenerating(false);
-              hasSetStaticPreview = true;
-            }
-          });
-
-          console.log("Gifler instance created", currentGifler);
-          setGiflerInstance(currentGifler);
+          };
+          bgImg.src = backgroundImage;
         } else if (backgroundImage) {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
@@ -347,17 +349,11 @@ export default function CreateQRPage() {
   };
 
   const handleDownloadQR = () => {
-    let downloadUrl = qrImageUrl;
-
-    if (backgroundImage && backgroundImageType === "image/gif" && canvasRef.current) {
-      downloadUrl = canvasRef.current.toDataURL("image/png");
-    }
-
-    if (!downloadUrl) return;
+    if (!qrImageUrl) return;
     
     const link = document.createElement("a");
     link.download = `qr-code-${form.watch("title") || "download"}.png`;
-    link.href = downloadUrl;
+    link.href = qrImageUrl;
     link.click();
 
     toast({
@@ -609,21 +605,31 @@ export default function CreateQRPage() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">Preview</h3>
               
-              <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square relative">
-                {backgroundImage && backgroundImageType === "image/gif" ? (
-                  <>
-                    <canvas
-                      ref={canvasRef}
-                      width={600}
-                      height={600}
-                      className="max-w-full max-h-full object-contain"
-                      data-testid="canvas-qr-preview"
+              <div className="bg-muted rounded-lg p-8 flex items-center justify-center aspect-square relative overflow-hidden">
+                {backgroundImage && backgroundImageType === "image/gif" && url ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {/* Animated GIF Background */}
+                    <img
+                      src={backgroundImage}
+                      alt="Animated Background"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{ imageRendering: 'auto' }}
                     />
-                    <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1">
+                    {/* QR Code Overlay - transparent PNG with QR and branding */}
+                    {qrOverlayUrl && (
+                      <img
+                        src={qrOverlayUrl}
+                        alt="QR Code"
+                        className="relative z-10 w-full h-full"
+                        data-testid="img-qr-overlay"
+                      />
+                    )}
+                    {/* Animated GIF Badge */}
+                    <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 z-20">
                       <ImageIcon className="h-3 w-3" />
                       Animated GIF
                     </div>
-                  </>
+                  </div>
                 ) : qrImageUrl ? (
                   <img
                     src={qrImageUrl}
