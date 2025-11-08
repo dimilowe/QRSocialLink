@@ -459,12 +459,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const campaign = await storage.getCampaignBySlug(req.params.slug);
       if (!campaign) {
-        return res.status(404).json({ message: "Campaign not found" });
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Campaign Not Found - QR Social</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                .container { max-width: 400px; }
+                h1 { color: #9333ea; font-size: 48px; margin: 0 0 16px 0; }
+                p { color: #a0a0a0; line-height: 1.6; }
+                a { color: #9333ea; text-decoration: none; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>404</h1>
+                <p>Campaign not found. This QR code may have been deleted or the link is invalid.</p>
+                <p><a href="/">Visit QR Social</a></p>
+              </div>
+            </body>
+          </html>
+        `);
       }
 
       const destinations = await storage.getCampaignDestinations(campaign.id);
       if (destinations.length === 0) {
-        return res.status(404).json({ message: "No destinations configured" });
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>No Destinations - QR Social</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                .container { max-width: 500px; }
+                h1 { color: #9333ea; font-size: 36px; margin: 0 0 16px 0; }
+                p { color: #a0a0a0; line-height: 1.6; margin: 12px 0; }
+                .campaign-name { color: #fff; font-weight: 600; }
+                a { color: #9333ea; text-decoration: none; display: inline-block; margin-top: 20px; padding: 12px 24px; border: 1px solid #9333ea; border-radius: 8px; }
+                a:hover { background: #9333ea; color: #fff; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>⚠️ Setup Required</h1>
+                <p class="campaign-name">"${campaign.name}"</p>
+                <p>This campaign hasn't been configured yet. The campaign owner needs to add at least one destination URL before this QR code will work.</p>
+                <a href="/">Visit QR Social</a>
+              </div>
+            </body>
+          </html>
+        `);
       }
 
       const strategy = createABStrategy(campaign.abStrategy);
@@ -490,7 +537,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.redirect(302, selectedDestination.url);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Error - QR Social</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+              .container { max-width: 400px; }
+              h1 { color: #ef4444; font-size: 36px; margin: 0 0 16px 0; }
+              p { color: #a0a0a0; line-height: 1.6; }
+              a { color: #9333ea; text-decoration: none; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Error</h1>
+              <p>Something went wrong while processing this QR code. Please try again later.</p>
+              <p><a href="/">Visit QR Social</a></p>
+            </div>
+          </body>
+        </html>
+      `);
     }
   });
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { ArrowLeft, Plus, Trash2, TrendingUp, MousePointerClick, Target, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, TrendingUp, MousePointerClick, Target, ExternalLink, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +119,7 @@ export default function CampaignDetailPage() {
     );
   }
 
+  const destinations = campaign.destinations || [];
   const conversionRate = campaign.totalScans > 0
     ? ((campaign.totalConversions / campaign.totalScans) * 100).toFixed(1)
     : "0.0";
@@ -150,7 +151,15 @@ export default function CampaignDetailPage() {
             <CardTitle className="text-base">Dynamic Redirect URL</CardTitle>
             <CardDescription>Use this URL in your QR code for A/B testing</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {destinations.length === 0 && (
+              <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <p className="text-sm text-yellow-500 font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Setup Required: Add at least one destination below before using this URL
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               <Input
                 readOnly
