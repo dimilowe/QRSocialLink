@@ -1,9 +1,9 @@
 # QR Social
 
-A social QR code scanning platform built with Next.js, Neon PostgreSQL, and Stripe.
+A marketing analytics platform for QR codes built with React, Neon PostgreSQL, and Stripe.
 
 ## Overview
-QR Social is a full-stack web application that allows users to scan QR codes, share them on a social feed, and interact with other users' scans. The platform includes a freemium model with Pro subscriptions.
+QR Social is a full-stack web application focused on QR code marketing analytics. Users can create custom branded QR codes with video overlays, run A/B tests on destinations, and track comprehensive analytics including device types, social media platform sources (TikTok, Instagram, YouTube), OS/browser data, and virality waves. The platform includes a 4-tier subscription model.
 
 ## Tech Stack
 - **Frontend**: React, TypeScript, Tailwind CSS, Wouter (routing), TanStack Query, Shadcn UI
@@ -20,12 +20,7 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
 - Session-based authentication
 - Protected routes
 
-### QR Code Scanning & Creation
-- Camera-based QR scanning using html5-qrcode
-- Image upload QR detection with jsqr
-- Automatic redirect to decoded URLs
-- QR code generation and storage
-- Scan history per user
+### QR Code Creation & Management
 - **Branded QR Code Creation**: Users can create custom QR codes with:
   - Purple branded borders (matching QR Social's primary color #9333EA)
   - "qrsocial.com" branding text at top
@@ -34,22 +29,20 @@ QR Social is a full-stack web application that allows users to scan QR codes, sh
   - Customizable QR colors (foreground/background)
   - Optional title field
   - Real-time preview
-  - Auto-post to social feed
+  - Download as PNG
+- QR code storage and history
+- Edit QR code destinations (Starter+ plans)
+- Dashboard view of all created QR codes
 
-### Social Feed
-- Public feed showing recent scans from all users
-- Scan cards with user info, QR thumbnail, and decoded link
-- Like/unlike functionality
-- Comment system
-- Follow/unfollow users
-- Tap-to-rescan feature (opens decoded link)
-
-### User Profiles
-- Profile header with avatar and stats (scans, followers, following)
-- Scan history grid with thumbnails
-- Free tier: last 10 scans
-- Pro tier: unlimited history
-- Logout functionality
+### Marketing Analytics Dashboard
+- Marketing-focused home page for logged-in users
+- Quick access to Create QR, Campaigns, and My QR Codes
+- Landing page for non-logged-in users highlighting key features:
+  - Branded QR codes
+  - A/B testing
+  - Advanced analytics
+  - Video overlay frames
+  - Social media tracking
 
 ### 4-Tier Subscription Model
 QR Social offers a freemium model with 4 pricing tiers:
@@ -196,9 +189,9 @@ Implementation:
   - QR Social branding ("qrsocial.com" + "long-press to open")
   - Color customization (foreground/background)
   - Real-time preview with title support
-  - Created QRs auto-post to feed with "Created" badge
-  - Bottom navigation updated (Home, Create, Activity, Profile)
-  - Desktop navigation in top header (Feed, Create, Activity)
+  - QR codes saved privately (not posted to social feed)
+  - Bottom navigation updated (Home, Create, Campaigns, QR Codes)
+  - Desktop navigation in top header (Home, Create QR, Campaigns, My QR Codes)
 - **4-Tier Subscription Pricing Implemented** (November 2025):
   - Replaced Free/Pro ($15) with Free/Starter ($10)/Pro ($30)/Unlimited ($99)
   - Added PLAN_TIERS and PLAN_LIMITS to shared/schema.ts
@@ -248,6 +241,18 @@ Implementation:
     - API endpoints for all analytics dimensions
     - User-friendly error pages for campaigns without destinations
   - Backend ready for frame overlays and analytics dashboard UI
+- **Pivoted from Social to Marketing App** (November 2025):
+  - Removed social feed posting feature
+  - QR codes now save privately instead of auto-posting to public feed
+  - Replaced "Feed" navigation with "Home" 
+  - Created marketing-focused landing page highlighting:
+    - Branded QR codes with video overlays
+    - A/B testing capabilities
+    - Advanced analytics (devices, platforms, OS, browser)
+    - Social media tracking
+  - Updated navigation: Home, Create QR, Campaigns, My QR Codes
+  - Simplified success messages to focus on marketing use case
+  - App positioned as QR code marketing analytics platform
 
 ## Stripe Webhook Configuration
 To enable automatic subscription management:
@@ -298,9 +303,8 @@ export const db = drizzle({ client: pool, schema });
 This configuration has been battle-tested and resolves SSL certificate issues that can occur with other PostgreSQL setups.
 
 ## Known Limitations / Future Enhancements
-- QR Drops feature UI created but backend not fully implemented
-- Analytics dashboard not yet built
-- No real-time feed updates (polling only)
+- Video overlay frame rendering (FFmpeg backend ready, UI not built)
+- Analytics dashboard visualization (data available via API, charts not built)
 - Avatar upload not yet implemented (using default avatars)
-- Rescan/repost functionality not implemented
-- QR code analytics (scan count tracking) not implemented
+- Social features (likes, comments, followers) exist in backend but hidden from UI
+- Advanced campaign analytics UI (time-series charts, device/platform breakdowns)
