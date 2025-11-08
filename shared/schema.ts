@@ -156,11 +156,17 @@ export const scanEvents = pgTable("scan_events", {
   campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
   scanId: uuid("scan_id").references(() => scans.id, { onDelete: "set null" }),
   destinationId: uuid("destination_id").references(() => destinations.id, { onDelete: "set null" }),
+  frameId: uuid("frame_id").references(() => frames.id, { onDelete: "set null" }),
   userAgent: text("user_agent"),
   ipHash: text("ip_hash"),
   referrer: text("referrer"),
   country: text("country"),
   platform: text("platform"),
+  deviceType: text("device_type"),
+  os: text("os"),
+  osVersion: text("os_version"),
+  browser: text("browser"),
+  browserVersion: text("browser_version"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 

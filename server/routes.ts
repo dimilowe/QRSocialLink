@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
+import { UAParser } from "ua-parser-js";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
@@ -28,6 +29,27 @@ const PLAN_PRICES = {
     name: "QR Social Enterprise",
   },
 } as const;
+
+function detectPlatform(referrer: string | null): string | null {
+  if (!referrer) return null;
+  
+  const referrerLower = referrer.toLowerCase();
+  
+  if (referrerLower.includes('tiktok.com')) return 'TikTok';
+  if (referrerLower.includes('instagram.com')) return 'Instagram';
+  if (referrerLower.includes('facebook.com')) return 'Facebook';
+  if (referrerLower.includes('youtube.com') || referrerLower.includes('youtu.be')) return 'YouTube';
+  if (referrerLower.includes('twitter.com') || referrerLower.includes('x.com')) return 'Twitter/X';
+  if (referrerLower.includes('linkedin.com')) return 'LinkedIn';
+  if (referrerLower.includes('pinterest.com')) return 'Pinterest';
+  if (referrerLower.includes('reddit.com')) return 'Reddit';
+  if (referrerLower.includes('snapchat.com')) return 'Snapchat';
+  if (referrerLower.includes('whatsapp.com')) return 'WhatsApp';
+  if (referrerLower.includes('telegram.')) return 'Telegram';
+  if (referrerLower.includes('google.com')) return 'Google Search';
+  
+  return 'Other';
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feed", async (req, res) => {
@@ -522,14 +544,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update((req.ip || "unknown") + (process.env.SESSION_SECRET || "salt"))
         .digest("hex");
 
+      const userAgentString = req.headers["user-agent"] || "";
+      const parser = new UAParser(userAgentString);
+      const uaResult = parser.getResult();
+      
+      const deviceType = uaResult.device.type || (uaResult.device.vendor ? 'mobile' : 'desktop');
+      const platform = detectPlatform(req.headers.referer || null);
+
       await storage.createScanEvent({
         campaignId: campaign.id,
         destinationId: selectedDestination.id,
-        userAgent: req.headers["user-agent"] || null,
+        frameId: null,
+        userAgent: userAgentString || null,
         ipHash,
         referrer: req.headers.referer || null,
         country: null,
-        platform: null,
+        platform,
+        deviceType,
+        os: uaResult.os.name || null,
+        osVersion: uaResult.os.version || null,
+        browser: uaResult.browser.name || null,
+        browserVersion: uaResult.browser.version || null,
         scanId: null,
       });
 
