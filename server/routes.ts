@@ -938,6 +938,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/generate-animated-qr", async (req, res) => {
+    let tempDir: string | null = null;
+    
     try {
       const { backgroundImageData, qrCodeData, imageFit } = req.body;
 
@@ -945,7 +947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required data" });
       }
 
-      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'qr-'));
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'qr-'));
       const backgroundPath = path.join(tempDir, 'background.gif');
       const qrPath = path.join(tempDir, 'qr.png');
       const outputPath = path.join(tempDir, 'output.gif');
@@ -967,12 +969,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ffmpegCommand = `ffmpeg -i "${backgroundPath}" -i "${qrPath}" -filter_complex "${filterComplex}" -y "${outputPath}"`;
       
-      await execAsync(ffmpegCommand);
+      await execAsync(ffmpegCommand, { maxBuffer: 10 * 1024 * 1024 });
 
       const outputBuffer = await fs.readFile(outputPath);
       const base64Output = outputBuffer.toString('base64');
-
-      await fs.rm(tempDir, { recursive: true, force: true });
 
       res.json({ 
         animatedQrCode: `data:image/gif;base64,${base64Output}` 
@@ -980,6 +980,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('FFmpeg error:', error);
       res.status(500).json({ message: error.message || "Failed to generate animated QR code" });
+    } finally {
+      if (tempDir) {
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.error('Cleanup error:', cleanupError);
+        }
+      }
     }
   });
 

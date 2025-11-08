@@ -348,18 +348,61 @@ export default function CreateQRPage() {
     }
   };
 
-  const handleDownloadQR = () => {
+  const handleDownloadQR = async () => {
     if (!qrImageUrl) return;
     
-    const link = document.createElement("a");
-    link.download = `qr-code-${form.watch("title") || "download"}.png`;
-    link.href = qrImageUrl;
-    link.click();
+    if (backgroundImage && backgroundImageType?.includes('gif')) {
+      try {
+        toast({
+          title: "Generating Animated QR...",
+          description: "Processing your animated QR code, this may take a few seconds",
+        });
 
-    toast({
-      title: "QR Code Downloaded",
-      description: "Your QR code has been saved to your device",
-    });
+        const response = await fetch('/api/generate-animated-qr', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            backgroundImageData: backgroundImage,
+            qrCodeData: qrOverlayUrl,
+            imageFit: imageFit,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate animated QR');
+        }
+
+        const data = await response.json();
+        
+        const link = document.createElement("a");
+        link.download = `qr-code-${form.watch("title") || "download"}.gif`;
+        link.href = data.animatedQrCode;
+        link.click();
+
+        toast({
+          title: "Animated QR Downloaded",
+          description: "Your animated QR code has been saved to your device",
+        });
+      } catch (error) {
+        toast({
+          title: "Download Failed",
+          description: "Could not generate animated QR. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      const link = document.createElement("a");
+      link.download = `qr-code-${form.watch("title") || "download"}.png`;
+      link.href = qrImageUrl;
+      link.click();
+
+      toast({
+        title: "QR Code Downloaded",
+        description: "Your QR code has been saved to your device",
+      });
+    }
   };
 
   return (
