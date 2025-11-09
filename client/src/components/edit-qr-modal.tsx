@@ -437,22 +437,71 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     try {
       const parsedUrl = new URL(url.trim());
       
-      updateMutation.mutate({
-        redirectUrl: url.trim() !== scan.decodedUrl ? url.trim() : null,
-        title: title.trim() || null,
-        foregroundColor,
-        backgroundColor,
-        borderColor,
-        enableBranding,
-        topText: enableBranding ? topText : null,
-        bottomText: enableBranding ? bottomText : null,
-        backgroundImage: backgroundImage || null,
-        borderShape,
-        imageFitMode: imageFit,
-        polaroidText: borderShape === "polaroid" ? polaroidText : null,
-        canvasFillEnabled,
-        canvasFillColor,
-      });
+      const updates: any = {};
+      
+      const normalizeValue = (val: any) => val || null;
+      
+      const newRedirectUrl = url.trim() !== scan.decodedUrl ? url.trim() : null;
+      if (normalizeValue(newRedirectUrl) !== normalizeValue(scan.redirectUrl)) {
+        updates.redirectUrl = newRedirectUrl;
+      }
+      
+      if (normalizeValue(title.trim()) !== normalizeValue(scan.title)) {
+        updates.title = title.trim() || null;
+      }
+      
+      if (foregroundColor !== (scan.foregroundColor || "#000000")) {
+        updates.foregroundColor = foregroundColor;
+      }
+      
+      if (backgroundColor !== (scan.backgroundColor || "#FFFFFF")) {
+        updates.backgroundColor = backgroundColor;
+      }
+      
+      if (borderColor !== (scan.borderColor || "#8B5CF6")) {
+        updates.borderColor = borderColor;
+      }
+      
+      if (enableBranding !== (scan.enableBranding || false)) {
+        updates.enableBranding = enableBranding;
+      }
+      
+      const newTopText = enableBranding ? topText : null;
+      if (normalizeValue(newTopText) !== normalizeValue(scan.topText)) {
+        updates.topText = newTopText;
+      }
+      
+      const newBottomText = enableBranding ? bottomText : null;
+      if (normalizeValue(newBottomText) !== normalizeValue(scan.bottomText)) {
+        updates.bottomText = newBottomText;
+      }
+      
+      if (normalizeValue(backgroundImage) !== normalizeValue(scan.backgroundImage)) {
+        updates.backgroundImage = backgroundImage || null;
+      }
+      
+      if (borderShape !== (scan.borderShape || "square")) {
+        updates.borderShape = borderShape;
+      }
+      
+      if (imageFit !== (scan.imageFitMode || "cover")) {
+        updates.imageFitMode = imageFit;
+      }
+      
+      const newPolaroidText = borderShape === "polaroid" ? polaroidText : null;
+      if (normalizeValue(newPolaroidText) !== normalizeValue(scan.polaroidText)) {
+        updates.polaroidText = newPolaroidText;
+      }
+      
+      if (canvasFillEnabled !== ((scan as any).canvasFillEnabled || false)) {
+        updates.canvasFillEnabled = canvasFillEnabled;
+      }
+      
+      if (canvasFillColor !== ((scan as any).canvasFillColor || "#FFFFFF")) {
+        updates.canvasFillColor = canvasFillColor;
+      }
+      
+      updateMutation.mutate(updates);
     } catch {
       toast({
         title: "Invalid URL",
