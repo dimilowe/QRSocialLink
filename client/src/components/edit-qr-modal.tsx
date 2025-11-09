@@ -66,6 +66,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/scans"] });
       toast({
         title: "QR Updated",
         description: "Your QR code has been updated successfully.",
