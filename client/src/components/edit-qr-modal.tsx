@@ -17,6 +17,9 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/lib/auth-context";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 interface EditQRModalProps {
   scan: Scan | null;
@@ -25,6 +28,7 @@ interface EditQRModalProps {
 }
 
 export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
+  const { user } = useAuth();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [foregroundColor, setForegroundColor] = useState("#000000");
@@ -43,6 +47,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const isFreeUser = user?.plan === 'free';
 
   useEffect(() => {
     if (scan && open) {
@@ -474,6 +480,16 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
             Update the appearance and destination of your QR code
           </DialogDescription>
         </DialogHeader>
+
+        {isFreeUser && (
+          <Alert className="mb-4">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Free plan users can only edit the <strong>Title</strong> field (scroll to top of form). 
+              Upgrade to Starter or higher to edit design, colors, and other settings.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ScrollArea className="h-[500px] pr-4">
