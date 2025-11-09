@@ -37,6 +37,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [borderShape, setBorderShape] = useState<"square" | "circle" | "star" | "polaroid" | "diamond" | "heart">("square");
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
   const [polaroidText, setPolaroidText] = useState("");
+  const [qrPreviewUrl, setQrPreviewUrl] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -54,8 +56,295 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       setBorderShape((scan.borderShape as any) || "square");
       setImageFit((scan.imageFitMode as any) || "cover");
       setPolaroidText(scan.polaroidText || "");
+      setQrPreviewUrl(scan.qrImageUrl || "");
     }
   }, [scan, open]);
+
+  // QR Preview Generation
+  useEffect(() => {
+    if (!url || !open) {
+      return;
+    }
+
+    const generatePreview = async () => {
+      setIsGenerating(true);
+      try {
+        const QRCode = (await import("qrcode")).default;
+        
+        const useTransparentBg = borderShape !== "square" && borderShape !== "polaroid";
+        const qrDataUrl = await QRCode.toDataURL(url, {
+          color: {
+            dark: foregroundColor,
+            light: useTransparentBg ? "#00000000" : backgroundColor,
+          },
+          width: 400,
+          margin: 1,
+        });
+
+        if (!enableBranding && !backgroundImage && borderShape === "square") {
+          setQrPreviewUrl(qrDataUrl);
+          setIsGenerating(false);
+          return;
+        }
+
+        const borderSize = 60;
+        const qrSize = 400;
+        const totalWidth = qrSize + borderSize * 2;
+        const totalHeight = borderShape === "polaroid" ? qrSize + borderSize * 2 + 100 : qrSize + borderSize * 2;
+        const qrX = borderSize;
+        const qrY = borderSize;
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas not supported");
+
+        canvas.width = totalWidth;
+        canvas.height = totalHeight;
+
+        const qrImage = new Image();
+        await new Promise((resolve) => {
+          qrImage.onload = resolve;
+          qrImage.src = qrDataUrl;
+        });
+
+        const drawQR = () => {
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw shape border
+          ctx.save();
+          ctx.beginPath();
+          const centerX = canvas.width / 2;
+          const centerY = borderShape === "polaroid" ? (canvas.height - 100) / 2 : canvas.height / 2;
+          
+          switch (borderShape) {
+            case "circle":
+              ctx.arc(centerX, centerY, Math.min(canvas.width, canvas.height) / 2, 0, Math.PI * 2);
+              break;
+            case "star":
+              const outerRadius = Math.min(canvas.width, canvas.height) / 2;
+              const innerRadius = outerRadius * 0.4;
+              for (let i = 0; i < 10; i++) {
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const angle = (Math.PI * i) / 5 - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+              }
+              ctx.closePath();
+              break;
+            case "heart":
+              const heartSize = Math.min(canvas.width, canvas.height) / 2.2;
+              const topY = centerY - heartSize * 0.3;
+              ctx.moveTo(centerX, topY + heartSize);
+              ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
+              ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
+              ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
+              ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
+              ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
+              ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
+              ctx.closePath();
+              break;
+            case "diamond":
+              ctx.moveTo(centerX, centerY - canvas.height / 2);
+              ctx.lineTo(centerX + canvas.width / 2, centerY);
+              ctx.lineTo(centerX, centerY + canvas.height / 2);
+              ctx.lineTo(centerX - canvas.width / 2, centerY);
+              ctx.closePath();
+              break;
+            default:
+              ctx.rect(0, 0, canvas.width, borderShape === "polaroid" ? canvas.height - 100 : canvas.height);
+          }
+          ctx.clip();
+          ctx.fillStyle = borderColor;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.restore();
+          
+          // Draw QR code
+          ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+          // Draw branding
+          if (enableBranding && borderShape !== "polaroid") {
+            if (topText) {
+              ctx.fillStyle = "#FFFFFF";
+              ctx.strokeStyle = "#000000";
+              ctx.lineWidth = 3;
+              ctx.font = "bold 24px Inter, sans-serif";
+              ctx.textAlign = "center";
+              ctx.strokeText(topText, canvas.width / 2, 35);
+              ctx.fillText(topText, canvas.width / 2, 35);
+            }
+            if (bottomText) {
+              ctx.fillStyle = "#FFFFFF";
+              ctx.strokeStyle = "#000000";
+              ctx.lineWidth = 3;
+              ctx.font = "16px Inter, sans-serif";
+              ctx.textAlign = "center";
+              const bottomY = canvas.height - 25;
+              ctx.strokeText(bottomText, canvas.width / 2, bottomY);
+              ctx.fillText(bottomText, canvas.width / 2, bottomY);
+            }
+          }
+
+          if (borderShape === "polaroid" && polaroidText) {
+            ctx.fillStyle = "#000000";
+            ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(polaroidText, canvas.width / 2, canvas.height - 50);
+          }
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          ctx.font = "10px Inter, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
+          
+          setQrPreviewUrl(canvas.toDataURL("image/png"));
+          setIsGenerating(false);
+        };
+
+        if (backgroundImage) {
+          const bgImg = new Image();
+          bgImg.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.beginPath();
+            const centerX = canvas.width / 2;
+            const centerY = borderShape === "polaroid" ? (canvas.height - 100) / 2 : canvas.height / 2;
+            
+            switch (borderShape) {
+              case "circle":
+                ctx.arc(centerX, centerY, Math.min(canvas.width, canvas.height) / 2, 0, Math.PI * 2);
+                break;
+              case "star":
+                const outerRadius = Math.min(canvas.width, canvas.height) / 2;
+                const innerRadius = outerRadius * 0.4;
+                for (let i = 0; i < 10; i++) {
+                  const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                  const angle = (Math.PI * i) / 5 - Math.PI / 2;
+                  const x = centerX + Math.cos(angle) * radius;
+                  const y = centerY + Math.sin(angle) * radius;
+                  if (i === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                break;
+              case "heart":
+                const heartSize = Math.min(canvas.width, canvas.height) / 2.2;
+                const topY = centerY - heartSize * 0.3;
+                ctx.moveTo(centerX, topY + heartSize);
+                ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
+                ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
+                ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
+                ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
+                ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
+                ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
+                ctx.closePath();
+                break;
+              case "diamond":
+                ctx.moveTo(centerX, centerY - canvas.height / 2);
+                ctx.lineTo(centerX + canvas.width / 2, centerY);
+                ctx.lineTo(centerX, centerY + canvas.height / 2);
+                ctx.lineTo(centerX - canvas.width / 2, centerY);
+                ctx.closePath();
+                break;
+              default:
+                ctx.rect(0, 0, canvas.width, borderShape === "polaroid" ? canvas.height - 100 : canvas.height);
+            }
+            ctx.clip();
+            
+            if (imageFit === "cover") {
+              const aspectRatio = bgImg.width / bgImg.height;
+              const canvasAspectRatio = canvas.width / canvas.height;
+              let drawWidth, drawHeight, offsetX, offsetY;
+              if (aspectRatio > canvasAspectRatio) {
+                drawHeight = canvas.height;
+                drawWidth = drawHeight * aspectRatio;
+                offsetX = (canvas.width - drawWidth) / 2;
+                offsetY = 0;
+              } else {
+                drawWidth = canvas.width;
+                drawHeight = drawWidth / aspectRatio;
+                offsetX = 0;
+                offsetY = (canvas.height - drawHeight) / 2;
+              }
+              ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
+            } else if (imageFit === "contain") {
+              const aspectRatio = bgImg.width / bgImg.height;
+              const canvasAspectRatio = canvas.width / canvas.height;
+              let drawWidth, drawHeight, offsetX, offsetY;
+              if (aspectRatio > canvasAspectRatio) {
+                drawWidth = canvas.width;
+                drawHeight = drawWidth / aspectRatio;
+                offsetX = 0;
+                offsetY = (canvas.height - drawHeight) / 2;
+              } else {
+                drawHeight = canvas.height;
+                drawWidth = drawHeight * aspectRatio;
+                offsetX = (canvas.width - drawWidth) / 2;
+                offsetY = 0;
+              }
+              ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
+            } else {
+              ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            }
+            ctx.restore();
+            
+            ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+            
+            if (enableBranding && borderShape !== "polaroid") {
+              if (topText) {
+                ctx.fillStyle = "#FFFFFF";
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.font = "bold 24px Inter, sans-serif";
+                ctx.textAlign = "center";
+                ctx.strokeText(topText, canvas.width / 2, 35);
+                ctx.fillText(topText, canvas.width / 2, 35);
+              }
+              if (bottomText) {
+                ctx.fillStyle = "#FFFFFF";
+                ctx.strokeStyle = "#000000";
+                ctx.lineWidth = 3;
+                ctx.font = "16px Inter, sans-serif";
+                ctx.textAlign = "center";
+                const bottomY = canvas.height - 25;
+                ctx.strokeText(bottomText, canvas.width / 2, bottomY);
+                ctx.fillText(bottomText, canvas.width / 2, bottomY);
+              }
+            }
+            
+            if (borderShape === "polaroid" && polaroidText) {
+              ctx.fillStyle = "#000000";
+              ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
+              ctx.textAlign = "center";
+              ctx.fillText(polaroidText, canvas.width / 2, canvas.height - 50);
+            }
+            
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+            ctx.font = "10px Inter, sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
+            
+            setQrPreviewUrl(canvas.toDataURL("image/png"));
+            setIsGenerating(false);
+          };
+          bgImg.src = backgroundImage;
+        } else {
+          drawQR();
+        }
+      } catch (err) {
+        console.error("QR preview error:", err);
+        setIsGenerating(false);
+      }
+    };
+
+    const debounce = setTimeout(generatePreview, 300);
+    return () => clearTimeout(debounce);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit, borderShape, polaroidText, open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -374,22 +663,26 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
 
           <div className="flex flex-col items-center justify-center">
             <div className="space-y-2 w-full">
-              <Label>Preview</Label>
-              <div className="flex items-center justify-center p-4 bg-background rounded-md border">
-                {scan?.qrImageUrl && (
+              <Label>Live Preview</Label>
+              <div className="flex items-center justify-center p-4 bg-background rounded-md border min-h-[420px]">
+                {isGenerating ? (
+                  <div className="text-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Generating preview...</p>
+                  </div>
+                ) : qrPreviewUrl ? (
                   <img 
-                    src={scan.qrImageUrl} 
+                    src={qrPreviewUrl} 
                     alt="QR Code Preview" 
                     className="max-w-full h-auto object-contain rounded"
                     style={{ maxHeight: "400px" }}
                   />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Enter a URL to see preview</p>
                 )}
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                Current QR code image
-              </p>
-              <p className="text-xs text-muted-foreground text-center">
-                Destination: {scan?.redirectUrl || scan?.decodedUrl}
+                Preview updates automatically as you make changes
               </p>
               <Button
                 type="button"
@@ -397,14 +690,15 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                 className="w-full"
                 onClick={() => {
                   const link = document.createElement('a');
-                  link.href = scan?.qrImageUrl || '';
+                  link.href = qrPreviewUrl || scan?.qrImageUrl || '';
                   link.download = `qr-code-${scan?.id}.png`;
                   link.click();
                 }}
                 data-testid="button-download"
+                disabled={!qrPreviewUrl}
               >
                 <Download className="h-4 w-4 mr-2" />
-                Download QR Code
+                Download Preview
               </Button>
             </div>
           </div>
