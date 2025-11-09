@@ -18,6 +18,15 @@ export default function OverlayGeneratorPage() {
   const [ctaText, setCtaText] = useState<string>("Scan to Shop");
   const [borderRadius, setBorderRadius] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  
+  const [textFont, setTextFont] = useState<string>("Inter");
+  const [textSize, setTextSize] = useState<number>(42);
+  const [textColor, setTextColor] = useState<string>("#FFFFFF");
+  const [qrSizeModifier, setQrSizeModifier] = useState<number>(100);
+  const [qrXOffset, setQrXOffset] = useState<number>(0);
+  const [qrYOffset, setQrYOffset] = useState<number>(0);
+  const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { data: scans } = useQuery<Scan[]>({
@@ -225,10 +234,10 @@ export default function OverlayGeneratorPage() {
         if (effectiveBorderRadius > 0) {
           ctx.beginPath();
           ctx.roundRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height, effectiveBorderRadius);
-          ctx.fillStyle = templateData.overlay.backgroundColor;
+          ctx.fillStyle = overlayColor;
           ctx.fill();
         } else {
-          ctx.fillStyle = templateData.overlay.backgroundColor;
+          ctx.fillStyle = overlayColor;
           ctx.fillRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
         }
         
@@ -240,25 +249,28 @@ export default function OverlayGeneratorPage() {
           qrImage.src = qrDataUrl;
         });
 
-        ctx.drawImage(qrImage, scaledQR.x, scaledQR.y, scaledQR.size, scaledQR.size);
+        const qrSizeAdjusted = scaledQR.size * (qrSizeModifier / 100);
+        const qrXAdjusted = scaledQR.x + qrXOffset;
+        const qrYAdjusted = scaledQR.y + qrYOffset;
+
+        ctx.drawImage(qrImage, qrXAdjusted, qrYAdjusted, qrSizeAdjusted, qrSizeAdjusted);
 
         if (ctaText && scaledCTA) {
-          const textColor = templateData.overlay.backgroundColor.includes("rgba(255") || templateData.overlay.backgroundColor.includes("rgba(139") ? "#000000" : "#FFFFFF";
-          const strokeColor = textColor === "#FFFFFF" ? "#000000" : "#FFFFFF";
-          
-          const isHorizontal = platformConfig.width > platformConfig.height;
-          const fontSize = isHorizontal ? 32 : 42;
+          const brightness = parseInt(textColor.slice(1, 3), 16) * 0.299 + 
+                           parseInt(textColor.slice(3, 5), 16) * 0.587 + 
+                           parseInt(textColor.slice(5, 7), 16) * 0.114;
+          const strokeColor = brightness > 128 ? "#000000" : "#FFFFFF";
           
           ctx.fillStyle = textColor;
           ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = isHorizontal ? 3 : 4;
-          ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+          ctx.lineWidth = 3;
+          ctx.font = `bold ${textSize}px ${textFont}, sans-serif`;
           ctx.textAlign = safeArea.cta.align || "center";
           
           const textX = safeArea.cta.align === "left" ? scaledCTA.x + 20 : 
                        safeArea.cta.align === "right" ? scaledCTA.x + scaledCTA.width - 20 :
                        scaledCTA.x + scaledCTA.width / 2;
-          const textY = scaledCTA.y + scaledCTA.height / 2 + (fontSize / 3);
+          const textY = scaledCTA.y + scaledCTA.height / 2 + (textSize / 3);
           
           ctx.strokeText(ctaText, textX, textY);
           ctx.fillText(ctaText, textX, textY);
@@ -271,7 +283,8 @@ export default function OverlayGeneratorPage() {
     };
 
     generatePreview();
-  }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates]);
+  }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates, 
+      textFont, textSize, textColor, qrSizeModifier, qrXOffset, qrYOffset, overlayColor]);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-4">
@@ -434,7 +447,29 @@ export default function OverlayGeneratorPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-color">Overlay Background Color</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="overlay-color"
+                        type="color"
+                        value={overlayColor}
+                        onChange={(e) => setOverlayColor(e.target.value)}
+                        className="w-20 h-10 p-1 cursor-pointer"
+                        data-testid="input-overlay-color"
+                      />
+                      <Input
+                        type="text"
+                        value={overlayColor}
+                        onChange={(e) => setOverlayColor(e.target.value)}
+                        className="flex-1"
+                        placeholder="#9333EA"
+                        data-testid="input-overlay-color-text"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="border-radius">Border Radius</Label>
@@ -449,10 +484,142 @@ export default function OverlayGeneratorPage() {
                       onValueChange={(value) => setBorderRadius(value[0])}
                       data-testid="slider-border-radius"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      0 = square edges, 50 = maximum rounding
-                    </p>
                   </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold text-sm mb-3">Text Styling</h4>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="text-font">Font</Label>
+                        <Select value={textFont} onValueChange={setTextFont}>
+                          <SelectTrigger id="text-font" data-testid="select-text-font">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Inter">Inter</SelectItem>
+                            <SelectItem value="Space Grotesk">Space Grotesk</SelectItem>
+                            <SelectItem value="Arial">Arial</SelectItem>
+                            <SelectItem value="Helvetica">Helvetica</SelectItem>
+                            <SelectItem value="Georgia">Georgia</SelectItem>
+                            <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                            <SelectItem value="Courier New">Courier New</SelectItem>
+                            <SelectItem value="Impact">Impact</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="text-size">Text Size</Label>
+                          <span className="text-sm text-muted-foreground">{textSize}px</span>
+                        </div>
+                        <Slider
+                          id="text-size"
+                          min={20}
+                          max={80}
+                          step={2}
+                          value={[textSize]}
+                          onValueChange={(value) => setTextSize(value[0])}
+                          data-testid="slider-text-size"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="text-color">Text Color</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="text-color"
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="w-20 h-10 p-1 cursor-pointer"
+                            data-testid="input-text-color"
+                          />
+                          <Input
+                            type="text"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="flex-1"
+                            placeholder="#FFFFFF"
+                            data-testid="input-text-color-text"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h4 className="font-semibold text-sm mb-3">QR Code Position & Size</h4>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="qr-size">Size</Label>
+                          <span className="text-sm text-muted-foreground">{qrSizeModifier}%</span>
+                        </div>
+                        <Slider
+                          id="qr-size"
+                          min={50}
+                          max={150}
+                          step={5}
+                          value={[qrSizeModifier]}
+                          onValueChange={(value) => setQrSizeModifier(value[0])}
+                          data-testid="slider-qr-size"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="qr-x">Horizontal Position</Label>
+                          <span className="text-sm text-muted-foreground">{qrXOffset}px</span>
+                        </div>
+                        <Slider
+                          id="qr-x"
+                          min={-200}
+                          max={200}
+                          step={10}
+                          value={[qrXOffset]}
+                          onValueChange={(value) => setQrXOffset(value[0])}
+                          data-testid="slider-qr-x"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="qr-y">Vertical Position</Label>
+                          <span className="text-sm text-muted-foreground">{qrYOffset}px</span>
+                        </div>
+                        <Slider
+                          id="qr-y"
+                          min={-200}
+                          max={200}
+                          step={10}
+                          value={[qrYOffset]}
+                          onValueChange={(value) => setQrYOffset(value[0])}
+                          data-testid="slider-qr-y"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      setTextFont("Inter");
+                      setTextSize(42);
+                      setTextColor("#FFFFFF");
+                      setQrSizeModifier(100);
+                      setQrXOffset(0);
+                      setQrYOffset(0);
+                      setOverlayColor("#9333EA");
+                      setBorderRadius(0);
+                    }}
+                    data-testid="button-reset-styles"
+                  >
+                    Reset to Defaults
+                  </Button>
                 </div>
               </CardContent>
             </Card>
