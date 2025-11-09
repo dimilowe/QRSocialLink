@@ -172,9 +172,12 @@ export default function CreateQRPage() {
         break;
         
       case "polaroid":
+        // Polaroid includes the full rectangle with footer area
+        ctx.rect(0, 0, width, height);
+        break;
       case "square":
       default:
-        ctx.rect(0, 0, width, shape === "polaroid" ? height - 100 : height);
+        ctx.rect(0, 0, width, height);
         break;
     }
   };
@@ -325,9 +328,8 @@ export default function CreateQRPage() {
 
           const bgImg = new Image();
           bgImg.onload = () => {
+            // Start with transparent canvas so the shape silhouette shows
             compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-            compositeCtx.fillStyle = "#FFFFFF";
-            compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
             
             // Draw shaped background image
             compositeCtx.save();
@@ -362,9 +364,8 @@ export default function CreateQRPage() {
 
           const bgImg = new Image();
           bgImg.onload = () => {
+            // Start with transparent canvas so the shape silhouette shows
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Draw shaped background image
             ctx.save();
@@ -397,8 +398,8 @@ export default function CreateQRPage() {
           canvas.width = totalWidth;
           canvas.height = totalHeight;
 
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // Start with transparent canvas so the shape silhouette shows
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
           
           // Draw shaped border with solid color
           createShapePath(ctx, borderShape, canvas.width, canvas.height);

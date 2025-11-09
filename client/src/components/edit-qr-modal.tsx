@@ -108,8 +108,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         });
 
         const drawQR = () => {
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // Start with transparent canvas so the shape silhouette shows
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
           
           // Draw shaped border filled with solid color
           ctx.beginPath();
@@ -152,8 +152,13 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
               ctx.lineTo(centerX - canvas.width / 2, centerY);
               ctx.closePath();
               break;
+            case "polaroid":
+              // Polaroid includes the full rectangle with footer area
+              ctx.rect(0, 0, canvas.width, canvas.height);
+              break;
             default:
-              ctx.rect(0, 0, canvas.width, borderShape === "polaroid" ? canvas.height - 100 : canvas.height);
+              // Square shape
+              ctx.rect(0, 0, canvas.width, canvas.height);
           }
           ctx.fillStyle = borderColor;
           ctx.fill();
@@ -212,9 +217,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         if (backgroundImage) {
           const bgImg = new Image();
           bgImg.onload = () => {
+            // Start with transparent canvas so the shape silhouette shows
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Draw shaped background image
             ctx.save();
@@ -258,8 +262,13 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                 ctx.lineTo(centerX - canvas.width / 2, centerY);
                 ctx.closePath();
                 break;
+              case "polaroid":
+                // Polaroid includes the full rectangle with footer area
+                ctx.rect(0, 0, canvas.width, canvas.height);
+                break;
               default:
-                ctx.rect(0, 0, canvas.width, borderShape === "polaroid" ? canvas.height - 100 : canvas.height);
+                // Square shape
+                ctx.rect(0, 0, canvas.width, canvas.height);
             }
             ctx.clip();
             
