@@ -128,9 +128,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const oldValue = (scan as any)[field];
             const newValue = (validatedData as any)[field];
             
+            console.log(`Comparing field ${field}:`, { oldValue, newValue, equal: oldValue === newValue });
+            
             if (oldValue !== newValue) {
+              console.log(`Blocked: Field ${field} was changed from ${oldValue} to ${newValue}`);
               return res.status(403).json({ 
-                message: "Upgrade to Starter or higher to edit QR code design and settings. Free users can only edit the title." 
+                message: `Upgrade to Starter or higher to edit QR code design and settings. Free users can only edit the title. (Field changed: ${field})` 
               });
             }
           }
