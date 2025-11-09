@@ -68,6 +68,10 @@ export const scans = pgTable("scans", {
   enableBranding: boolean("enable_branding").default(false),
   foregroundColor: text("foreground_color"),
   backgroundColor: text("background_color"),
+  backgroundImage: text("background_image"),
+  borderShape: text("border_shape").default("square"),
+  imageFitMode: text("image_fit_mode").default("cover"),
+  polaroidText: text("polaroid_text"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

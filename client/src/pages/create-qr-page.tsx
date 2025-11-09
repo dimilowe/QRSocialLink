@@ -430,6 +430,10 @@ export default function CreateQRPage() {
         enableBranding,
         foregroundColor,
         backgroundColor,
+        backgroundImage: backgroundImage || null,
+        borderShape,
+        imageFitMode: imageFit,
+        polaroidText: borderShape === "polaroid" ? polaroidText : null,
       });
       return response.json();
     },
