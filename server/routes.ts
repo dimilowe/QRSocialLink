@@ -122,13 +122,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!canEdit) {
         const freeEditableFields = ['title'];
-        const requestedFields = Object.keys(validatedData);
-        const restrictedFields = requestedFields.filter(f => !freeEditableFields.includes(f));
         
-        if (restrictedFields.length > 0) {
-          return res.status(403).json({ 
-            message: "Upgrade to Starter or higher to edit QR code design and settings. Free users can only edit the title." 
-          });
+        for (const field of Object.keys(validatedData)) {
+          if (!freeEditableFields.includes(field)) {
+            const oldValue = (scan as any)[field];
+            const newValue = (validatedData as any)[field];
+            
+            if (oldValue !== newValue) {
+              return res.status(403).json({ 
+                message: "Upgrade to Starter or higher to edit QR code design and settings. Free users can only edit the title." 
+              });
+            }
+          }
         }
       }
       
