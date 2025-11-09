@@ -192,12 +192,11 @@ export default function CreateQRPage() {
       try {
         const QRCode = (await import("qrcode")).default;
         
-        const useTransparentBg = borderShape !== "square" && borderShape !== "polaroid";
-        
+        // Always use solid background since we punch out a white square for the QR code
         const qrDataUrl = await QRCode.toDataURL(url, {
           color: {
             dark: foregroundColor,
-            light: useTransparentBg ? "#00000000" : backgroundColor,
+            light: backgroundColor,
           },
           width: 400,
           margin: 1,
@@ -330,11 +329,21 @@ export default function CreateQRPage() {
             compositeCtx.fillStyle = "#FFFFFF";
             compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
             
+            // Draw shaped background image
             compositeCtx.save();
             createShapePath(compositeCtx, borderShape, compositeCanvas.width, compositeCanvas.height);
             compositeCtx.clip();
             drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, compositeCanvas.width, compositeCanvas.height);
             compositeCtx.restore();
+            
+            // Punch out a square hole for QR code
+            compositeCtx.globalCompositeOperation = "destination-out";
+            compositeCtx.fillRect(qrX, qrY, qrSize, qrSize);
+            compositeCtx.globalCompositeOperation = "source-over";
+            
+            // Fill the punched hole with white background for clean QR area
+            compositeCtx.fillStyle = "#FFFFFF";
+            compositeCtx.fillRect(qrX, qrY, qrSize, qrSize);
             
             drawQROverlay(compositeCtx, compositeCanvas.width, compositeCanvas.height);
 
@@ -357,11 +366,21 @@ export default function CreateQRPage() {
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Draw shaped background image
             ctx.save();
             createShapePath(ctx, borderShape, canvas.width, canvas.height);
             ctx.clip();
             drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, canvas.width, canvas.height);
             ctx.restore();
+            
+            // Punch out a square hole for QR code
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.fillRect(qrX, qrY, qrSize, qrSize);
+            ctx.globalCompositeOperation = "source-over";
+            
+            // Fill the punched hole with white background for clean QR area
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(qrX, qrY, qrSize, qrSize);
             
             drawQROverlay(ctx, canvas.width, canvas.height);
 
@@ -381,12 +400,19 @@ export default function CreateQRPage() {
           ctx.fillStyle = "#FFFFFF";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          ctx.save();
+          // Draw shaped border with solid color
           createShapePath(ctx, borderShape, canvas.width, canvas.height);
-          ctx.clip();
           ctx.fillStyle = borderColor;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.restore();
+          ctx.fill();
+          
+          // Punch out a square hole for QR code
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
+          ctx.globalCompositeOperation = "source-over";
+          
+          // Fill the punched hole with white background for clean QR area
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
           
           drawQROverlay(ctx, canvas.width, canvas.height);
 

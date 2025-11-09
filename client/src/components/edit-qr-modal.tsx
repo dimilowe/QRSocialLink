@@ -111,8 +111,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
           ctx.fillStyle = "#FFFFFF";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          // Draw shape border
-          ctx.save();
+          // Draw shaped border filled with solid color
           ctx.beginPath();
           const centerX = canvas.width / 2;
           const centerY = borderShape === "polaroid" ? (canvas.height - 100) / 2 : canvas.height / 2;
@@ -156,12 +155,19 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
             default:
               ctx.rect(0, 0, canvas.width, borderShape === "polaroid" ? canvas.height - 100 : canvas.height);
           }
-          ctx.clip();
           ctx.fillStyle = borderColor;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.restore();
+          ctx.fill();
           
-          // Draw QR code
+          // Punch out a square hole for QR code
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
+          ctx.globalCompositeOperation = "source-over";
+          
+          // Fill the punched hole with white background for clean QR area
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
+          
+          // Draw QR code in the clean white square
           ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
           // Draw branding
@@ -210,6 +216,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
             ctx.fillStyle = "#FFFFFF";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Draw shaped background image
             ctx.save();
             ctx.beginPath();
             const centerX = canvas.width / 2;
@@ -256,6 +263,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
             }
             ctx.clip();
             
+            // Draw background image within the shape
             if (imageFit === "cover") {
               const aspectRatio = bgImg.width / bgImg.height;
               const canvasAspectRatio = canvas.width / canvas.height;
@@ -293,6 +301,16 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
             }
             ctx.restore();
             
+            // Punch out a square hole for QR code
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.fillRect(qrX, qrY, qrSize, qrSize);
+            ctx.globalCompositeOperation = "source-over";
+            
+            // Fill the punched hole with white background for clean QR area
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(qrX, qrY, qrSize, qrSize);
+            
+            // Draw QR code in the clean white square
             ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
             
             if (enableBranding && borderShape !== "polaroid") {
