@@ -51,6 +51,8 @@ export default function CreateQRPage() {
   const [imageFit, setImageFit] = useState<"cover" | "contain" | "stretch">("cover");
   const [borderShape, setBorderShape] = useState<"square" | "circle" | "star" | "polaroid" | "diamond" | "heart">("square");
   const [polaroidText, setPolaroidText] = useState("");
+  const [canvasFillEnabled, setCanvasFillEnabled] = useState(false);
+  const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
   const [giflerInstance, setGiflerInstance] = useState<any>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -328,8 +330,13 @@ export default function CreateQRPage() {
 
           const bgImg = new Image();
           bgImg.onload = () => {
-            // Start with transparent canvas so the shape silhouette shows
-            compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            // Start with transparent or colored canvas background
+            if (canvasFillEnabled) {
+              compositeCtx.fillStyle = canvasFillColor;
+              compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            } else {
+              compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+            }
             
             // Draw shaped background image
             compositeCtx.save();
@@ -364,8 +371,13 @@ export default function CreateQRPage() {
 
           const bgImg = new Image();
           bgImg.onload = () => {
-            // Start with transparent canvas so the shape silhouette shows
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Start with transparent or colored canvas background
+            if (canvasFillEnabled) {
+              ctx.fillStyle = canvasFillColor;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
             
             // Draw shaped background image
             ctx.save();
@@ -398,8 +410,13 @@ export default function CreateQRPage() {
           canvas.width = totalWidth;
           canvas.height = totalHeight;
 
-          // Start with transparent canvas so the shape silhouette shows
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          // Start with transparent or colored canvas background
+          if (canvasFillEnabled) {
+            ctx.fillStyle = canvasFillColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
           
           // Draw shaped border with solid color
           createShapePath(ctx, borderShape, canvas.width, canvas.height);
@@ -437,7 +454,7 @@ export default function CreateQRPage() {
         giflerInstance.stop();
       }
     };
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, borderShape, polaroidText]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -461,6 +478,8 @@ export default function CreateQRPage() {
         borderShape,
         imageFitMode: imageFit,
         polaroidText: borderShape === "polaroid" ? polaroidText : null,
+        canvasFillEnabled,
+        canvasFillColor,
       });
       return response.json();
     },
@@ -815,6 +834,47 @@ export default function CreateQRPage() {
                                 Click to upload an image for the QR code background
                               </p>
                             </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3 p-4 border rounded-md">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="canvas-fill-enabled"
+                            checked={canvasFillEnabled}
+                            onChange={(e) => setCanvasFillEnabled(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300"
+                            data-testid="checkbox-canvas-fill"
+                          />
+                          <FormLabel htmlFor="canvas-fill-enabled" className="cursor-pointer">
+                            Fill background outside shape
+                          </FormLabel>
+                        </div>
+                        {canvasFillEnabled && (
+                          <div className="space-y-2">
+                            <FormLabel htmlFor="canvas-fill-color">Fill Color</FormLabel>
+                            <div className="flex gap-2">
+                              <input
+                                id="canvas-fill-color"
+                                type="color"
+                                value={canvasFillColor}
+                                onChange={(e) => setCanvasFillColor(e.target.value)}
+                                className="h-10 w-20 rounded-md border cursor-pointer"
+                                data-testid="input-canvas-fill-color"
+                              />
+                              <Input
+                                type="text"
+                                value={canvasFillColor}
+                                onChange={(e) => setCanvasFillColor(e.target.value)}
+                                className="flex-1"
+                                data-testid="input-canvas-fill-color-text"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Fill the canvas background outside the shaped border
+                            </p>
                           </div>
                         )}
                       </div>
