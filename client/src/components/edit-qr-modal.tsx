@@ -45,6 +45,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [canvasFillEnabled, setCanvasFillEnabled] = useState(false);
   const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
+  const [originalScan, setOriginalScan] = useState<Scan | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -52,6 +53,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
 
   useEffect(() => {
     if (scan && open) {
+      setOriginalScan(scan);
       setUrl(scan.redirectUrl || scan.decodedUrl);
       setTitle(scan.title || "");
       setForegroundColor(scan.foregroundColor || "#000000");
@@ -432,72 +434,83 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!scan) return;
+    if (!scan || !originalScan) return;
 
     try {
       const parsedUrl = new URL(url.trim());
       
-      const updates: any = {};
+      if (isFreeUser) {
+        const updates: any = {};
+        const normalizeValue = (val: any) => val || null;
+        
+        if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
+          updates.title = title.trim() || null;
+        }
+        
+        updateMutation.mutate(updates);
+        return;
+      }
       
+      const updates: any = {};
       const normalizeValue = (val: any) => val || null;
       
-      const newRedirectUrl = url.trim() !== scan.decodedUrl ? url.trim() : null;
-      if (normalizeValue(newRedirectUrl) !== normalizeValue(scan.redirectUrl)) {
+      const newRedirectUrl = url.trim() !== originalScan.decodedUrl ? url.trim() : null;
+      if (normalizeValue(newRedirectUrl) !== normalizeValue(originalScan.redirectUrl)) {
         updates.redirectUrl = newRedirectUrl;
       }
       
-      if (normalizeValue(title.trim()) !== normalizeValue(scan.title)) {
+      if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
         updates.title = title.trim() || null;
       }
       
-      if (foregroundColor !== (scan.foregroundColor || "#000000")) {
+      if (foregroundColor !== (originalScan.foregroundColor || "#000000")) {
         updates.foregroundColor = foregroundColor;
       }
       
-      if (backgroundColor !== (scan.backgroundColor || "#FFFFFF")) {
+      if (backgroundColor !== (originalScan.backgroundColor || "#FFFFFF")) {
         updates.backgroundColor = backgroundColor;
       }
       
-      if (borderColor !== (scan.borderColor || "#8B5CF6")) {
+      if (borderColor !== (originalScan.borderColor || "#8B5CF6")) {
         updates.borderColor = borderColor;
       }
       
-      if (enableBranding !== (scan.enableBranding || false)) {
+      if (enableBranding !== (originalScan.enableBranding || false)) {
         updates.enableBranding = enableBranding;
       }
       
       const newTopText = enableBranding ? topText : null;
-      if (normalizeValue(newTopText) !== normalizeValue(scan.topText)) {
+      if (normalizeValue(newTopText) !== normalizeValue(originalScan.topText)) {
         updates.topText = newTopText;
       }
       
       const newBottomText = enableBranding ? bottomText : null;
-      if (normalizeValue(newBottomText) !== normalizeValue(scan.bottomText)) {
+      if (normalizeValue(newBottomText) !== normalizeValue(originalScan.bottomText)) {
         updates.bottomText = newBottomText;
       }
       
-      if (normalizeValue(backgroundImage) !== normalizeValue(scan.backgroundImage)) {
+      if (normalizeValue(backgroundImage) !== normalizeValue(originalScan.backgroundImage)) {
         updates.backgroundImage = backgroundImage || null;
       }
       
-      if (borderShape !== (scan.borderShape || "square")) {
+      if (borderShape !== (originalScan.borderShape || "square")) {
         updates.borderShape = borderShape;
       }
       
-      if (imageFit !== (scan.imageFitMode || "cover")) {
+      if (imageFit !== (originalScan.imageFitMode || "cover")) {
         updates.imageFitMode = imageFit;
       }
       
       const newPolaroidText = borderShape === "polaroid" ? polaroidText : null;
-      if (normalizeValue(newPolaroidText) !== normalizeValue(scan.polaroidText)) {
+      if (normalizeValue(newPolaroidText) !== normalizeValue(originalScan.polaroidText)) {
         updates.polaroidText = newPolaroidText;
       }
       
-      if (canvasFillEnabled !== ((scan as any).canvasFillEnabled || false)) {
+      if (canvasFillEnabled !== ((originalScan as any).canvasFillEnabled || false)) {
         updates.canvasFillEnabled = canvasFillEnabled;
       }
       
-      if (canvasFillColor !== ((scan as any).canvasFillColor || "#FFFFFF")) {
+      if (canvasFillColor !== ((originalScan as any).canvasFillColor || "#FFFFFF")) {
         updates.canvasFillColor = canvasFillColor;
       }
       
