@@ -179,16 +179,7 @@ export default function OverlayGeneratorPage() {
 
     const generatePreview = async () => {
       try {
-        const QRCode = (await import("qrcode")).default;
-        
-        const qrDataUrl = await QRCode.toDataURL(scan.decodedUrl, {
-          color: {
-            dark: "#000000",
-            light: "#ffffff",
-          },
-          width: 400,
-          margin: 1,
-        });
+        const qrDataUrl = scan.qrImageUrl;
 
         const canvas = canvasRef.current;
         if (!canvas) return;
