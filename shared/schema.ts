@@ -72,6 +72,8 @@ export const scans = pgTable("scans", {
   borderShape: text("border_shape").default("square"),
   imageFitMode: text("image_fit_mode").default("cover"),
   polaroidText: text("polaroid_text"),
+  canvasFillEnabled: boolean("canvas_fill_enabled").default(false),
+  canvasFillColor: text("canvas_fill_color").default("#FFFFFF"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

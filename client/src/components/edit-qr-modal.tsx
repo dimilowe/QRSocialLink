@@ -39,6 +39,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [polaroidText, setPolaroidText] = useState("");
   const [qrPreviewUrl, setQrPreviewUrl] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [canvasFillEnabled, setCanvasFillEnabled] = useState(false);
+  const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -56,6 +58,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       setBorderShape((scan.borderShape as any) || "square");
       setImageFit((scan.imageFitMode as any) || "cover");
       setPolaroidText(scan.polaroidText || "");
+      setCanvasFillEnabled((scan as any).canvasFillEnabled || false);
+      setCanvasFillColor((scan as any).canvasFillColor || "#FFFFFF");
       setQrPreviewUrl(scan.qrImageUrl || "");
     }
   }, [scan, open]);
@@ -108,8 +112,13 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         });
 
         const drawQR = () => {
-          // Start with transparent canvas so the shape silhouette shows
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          // Fill canvas with background color or keep transparent
+          if (canvasFillEnabled) {
+            ctx.fillStyle = canvasFillColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
           
           // Draw shaped border filled with solid color
           ctx.beginPath();
@@ -217,8 +226,13 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         if (backgroundImage) {
           const bgImg = new Image();
           bgImg.onload = () => {
-            // Start with transparent canvas so the shape silhouette shows
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Fill canvas with background color or keep transparent
+            if (canvasFillEnabled) {
+              ctx.fillStyle = canvasFillColor;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
             
             // Draw shaped background image
             ctx.save();
@@ -371,7 +385,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
 
     const debounce = setTimeout(generatePreview, 300);
     return () => clearTimeout(debounce);
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit, borderShape, polaroidText, open]);
+  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor, open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -430,6 +444,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         borderShape,
         imageFitMode: imageFit,
         polaroidText: borderShape === "polaroid" ? polaroidText : null,
+        canvasFillEnabled,
+        canvasFillColor,
       });
     } catch {
       toast({
@@ -592,6 +608,42 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                         <SelectItem value="stretch">Stretch (May Distort)</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="canvasFill"
+                    checked={canvasFillEnabled}
+                    onCheckedChange={(checked) => setCanvasFillEnabled(checked as boolean)}
+                    data-testid="checkbox-canvas-fill"
+                  />
+                  <Label htmlFor="canvasFill" className="text-sm cursor-pointer">
+                    Fill background outside shape
+                  </Label>
+                </div>
+                {canvasFillEnabled && (
+                  <div className="space-y-2">
+                    <Label htmlFor="canvasFillColor">Background Fill Color</Label>
+                    <div className="flex gap-2">
+                      <input
+                        id="canvasFillColor"
+                        type="color"
+                        value={canvasFillColor}
+                        onChange={(e) => setCanvasFillColor(e.target.value)}
+                        className="h-10 w-full rounded-md border cursor-pointer"
+                        data-testid="input-canvas-fill-color"
+                      />
+                      <Input
+                        type="text"
+                        value={canvasFillColor}
+                        onChange={(e) => setCanvasFillColor(e.target.value)}
+                        className="flex-1"
+                        placeholder="#FFFFFF"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
