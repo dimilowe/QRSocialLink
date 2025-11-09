@@ -2,11 +2,12 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { type User as SelectUser } from "@shared/schema";
+import { pool } from "../db";
 
 const scryptAsync = promisify(scrypt);
 const crypto = {
@@ -34,7 +35,7 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
-  const MemoryStore = createMemoryStore(session);
+  const PgStore = connectPgSimple(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "qr-social-secret-key-change-in-production",
     resave: false,
@@ -42,8 +43,9 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7,
     },
-    store: new MemoryStore({
-      checkPeriod: 86400000,
+    store: new PgStore({
+      pool: pool,
+      createTableIfMissing: true,
     }),
   };
 
