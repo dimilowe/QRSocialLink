@@ -104,6 +104,7 @@ export class OverlayProcessor {
         textFont = "Arial",
         textSize = 48,
         borderRadius = 24,
+        ctaText = "",
       } = renderConfig;
 
       const safeArea = typeof frame.safeArea === 'string' 
@@ -119,11 +120,20 @@ export class OverlayProcessor {
         throw new Error("QR code image not found on scan");
       }
 
-      const qrData = scan.qrImageUrl.startsWith('data:') 
-        ? scan.qrImageUrl.split(',')[1]
-        : scan.qrImageUrl;
-      const qrBuffer = Buffer.from(qrData, 'base64');
-      await fs.writeFile(qrPath, qrBuffer);
+      if (scan.qrImageUrl.startsWith('http://') || scan.qrImageUrl.startsWith('https://')) {
+        const response = await fetch(scan.qrImageUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch QR image: ${response.statusText}`);
+        }
+        const qrBuffer = Buffer.from(await response.arrayBuffer());
+        await fs.writeFile(qrPath, qrBuffer);
+      } else {
+        const qrData = scan.qrImageUrl.startsWith('data:') 
+          ? scan.qrImageUrl.split(',')[1]
+          : scan.qrImageUrl;
+        const qrBuffer = Buffer.from(qrData, 'base64');
+        await fs.writeFile(qrPath, qrBuffer);
+      }
 
       const qrScale = 200 * qrSizeModifier;
       const qrX = (overlayWidth / 2) - (qrScale / 2) + qrXOffset;
@@ -135,15 +145,28 @@ export class OverlayProcessor {
         : (frameHeight - overlayHeight - 100);
 
       const overlayHex = overlayColor.replace('#', '');
+      const textColorHex = textColor.replace('#', '');
+      
       let filterComplex = `color=c=black:s=${frameWidth}x${frameHeight}[bg];`;
       filterComplex += `color=c=0x${overlayHex}:s=${overlayWidth}x${overlayHeight}[overlay];`;
       filterComplex += `[1:v]scale=${qrScale}:${qrScale}[qr];`;
       filterComplex += `[overlay][qr]overlay=${qrX}:${qrY}[overlay_with_qr];`;
-      filterComplex += `[bg][overlay_with_qr]overlay=${overlayX}:${overlayY}`;
+      
+      let finalComposite = "[bg][overlay_with_qr]overlay=" + overlayX + ":" + overlayY;
+      
+      if (ctaText && ctaText.trim()) {
+        const escapedText = ctaText.replace(/'/g, "'\\\\\\''").replace(/:/g, "\\\\:");
+        const absoluteTextY = overlayY + qrY + qrScale + 40;
+        
+        filterComplex += finalComposite + "[composed];";
+        filterComplex += `[composed]drawtext=text='${escapedText}':fontcolor=0x${textColorHex}:fontsize=${textSize}:x=(w-text_w)/2:y=${absoluteTextY}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
+      } else {
+        filterComplex += finalComposite;
+      }
 
       const ffmpegCommand = `ffmpeg -f lavfi -i color=c=black:s=${frameWidth}x${frameHeight} -i "${qrPath}" -filter_complex "${filterComplex}" -frames:v 1 -y "${outputPath}"`;
 
-      console.log(`[OverlayProcessor] Generating static PNG overlay`);
+      console.log(`[OverlayProcessor] Generating static PNG overlay with${ctaText ? '' : 'out'} CTA text`);
       await execAsync(ffmpegCommand, { maxBuffer: 50 * 1024 * 1024 });
 
       await this.storage.updateOverlayRendition(overlay.id, {
@@ -175,7 +198,7 @@ export class OverlayProcessor {
   }
 
   async getOutputPath(renditionId: string): Promise<string | null> {
-    const outputPath = path.join(this.OUTPUT_DIR, `${renditionId}.mp4`);
+    const outputPath = path.join(this.OUTPUT_DIR, `${renditionId}.png`);
     
     try {
       await fs.access(outputPath);
