@@ -31,6 +31,7 @@ export default function OverlayGeneratorPage() {
   const [qrSizeModifier, setQrSizeModifier] = useState<number>(100);
   const [qrOffsetPercent, setQrOffsetPercent] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [qrOffsetPx, setQrOffsetPx] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [pendingQrOffsets, setPendingQrOffsets] = useState<{x: number, y: number} | null>(null);
   const [qrXOffset, setQrXOffset] = useState<number>(0);
   const [qrYOffset, setQrYOffset] = useState<number>(0);
   const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
@@ -154,7 +155,7 @@ export default function OverlayGeneratorPage() {
       if (config.qrXOffset !== undefined || config.qrYOffset !== undefined) {
         const xOffset = config.qrXOffset ?? 0;
         const yOffset = config.qrYOffset ?? 0;
-        setTimeout(() => updateQrOffset({ px: { x: xOffset, y: yOffset } }), 100);
+        setPendingQrOffsets({ x: xOffset, y: yOffset });
       }
       if (config.overlayColor) setOverlayColor(config.overlayColor);
       if (config.overlayBackgroundImage) setOverlayBackgroundImage(config.overlayBackgroundImage);
@@ -193,6 +194,7 @@ export default function OverlayGeneratorPage() {
 
   useEffect(() => {
     if (!selectedFrame || !platformConfig) {
+      setQrOffsetPercent({ x: 0, y: 0 });
       setQrOffsetPx({ x: 0, y: 0 });
       setQrXOffset(0);
       setQrYOffset(0);
@@ -222,6 +224,13 @@ export default function OverlayGeneratorPage() {
       console.error("Failed to recalculate QR offsets:", e);
     }
   }, [selectedFrame, platformConfig, qrOffsetPercent, overlayWidth, overlayHeight]);
+
+  useEffect(() => {
+    if (pendingQrOffsets && selectedFrame && platformConfig) {
+      updateQrOffset({ px: pendingQrOffsets });
+      setPendingQrOffsets(null);
+    }
+  }, [pendingQrOffsets, selectedFrame, platformConfig]);
 
   const updateQrOffset = (params: { px?: { x: number; y: number }; percent?: { x: number; y: number } }) => {
     if (!selectedFrame || !platformConfig) return;
@@ -1416,8 +1425,7 @@ export default function OverlayGeneratorPage() {
                       setTextSize(42);
                       setTextColor("#FFFFFF");
                       setQrSizeModifier(100);
-                      setQrXOffset(0);
-                      setQrYOffset(0);
+                      updateQrOffset({ px: { x: 0, y: 0 } });
                       setOverlayColor("#9333EA");
                       setOverlayBackgroundImage("");
                       setOverlayImageFit("cover");
