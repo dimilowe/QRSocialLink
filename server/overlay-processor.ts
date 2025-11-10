@@ -109,14 +109,7 @@ export class OverlayProcessor {
       } = renderConfig;
       const ctaText = overlay.ctaText || "";
 
-      const safeArea = typeof frame.safeArea === 'string' 
-        ? JSON.parse(frame.safeArea) 
-        : frame.safeArea;
-      
-      const frameWidth = 1080;
-      const frameHeight = 1920;
-
-      console.log(`[OverlayProcessor] Rendering ${frameWidth}x${frameHeight} overlay for ${frame.name}`);
+      console.log(`[OverlayProcessor] Rendering ${overlayWidth}x${overlayHeight} overlay banner for ${frame.name}`);
 
       if (!scan.qrImageUrl) {
         throw new Error("QR code image not found on scan");
@@ -140,30 +133,8 @@ export class OverlayProcessor {
       const qrScale = Math.min(Math.max(200 * qrSizeModifier, 50), 800);
       const qrX = (overlayWidth / 2) - (qrScale / 2) + qrXOffset;
       const qrY = (overlayHeight / 2) - (qrScale / 2) + qrYOffset;
-      
-      const overlayX = (frameWidth - overlayWidth) / 2;
-      const overlayY = safeArea?.bottom 
-        ? (frameHeight - safeArea.bottom - overlayHeight - 50)
-        : (frameHeight - overlayHeight - 100);
 
       const overlayPanelPath = path.join(tempDir, "panel.png");
-      const compositePath = path.join(tempDir, "composite.png");
-      
-      const createPanelCmd = `convert -size ${overlayWidth}x${overlayHeight} xc:"${overlayColor}" -alpha set -channel RGBA -background none -fill "${overlayColor}" -draw "roundrectangle 0,0 ${overlayWidth},${overlayHeight} ${borderRadius},${borderRadius}" "${overlayPanelPath}"`;
-      await execAsync(createPanelCmd, { maxBuffer: 50 * 1024 * 1024 });
-      
-      const resizeQrCmd = `convert "${qrPath}" -resize ${qrScale}x${qrScale}! "${qrPath}"`;
-      await execAsync(resizeQrCmd, { maxBuffer: 50 * 1024 * 1024 });
-      
-      const overlayQrCmd = `convert "${overlayPanelPath}" "${qrPath}" -geometry +${qrX}+${qrY} -composite "${overlayPanelPath}"`;
-      await execAsync(overlayQrCmd, { maxBuffer: 50 * 1024 * 1024 });
-      
-      if (ctaText && ctaText.trim()) {
-        const textX = overlayWidth / 2;
-        const textY = qrY + qrScale + 40;
-        const addTextCmd = `convert "${overlayPanelPath}" -font DejaVu-Sans-Bold -pointsize ${textSize} -fill "${textColor}" -gravity North -annotate +0+${textY} "${ctaText.replace(/"/g, '\\"')}" "${overlayPanelPath}"`;
-        await execAsync(addTextCmd, { maxBuffer: 50 * 1024 * 1024 });
-      }
       
       if (overlayBackgroundImage && overlayBackgroundImage.trim()) {
         const bgImagePath = path.join(tempDir, "bg-image.png");
@@ -185,24 +156,36 @@ export class OverlayProcessor {
         
         let resizeMode = "";
         if (overlayImageFit === "cover") {
-          resizeMode = `${frameWidth}x${frameHeight}^ -gravity center -extent ${frameWidth}x${frameHeight}`;
+          resizeMode = `${overlayWidth}x${overlayHeight}^ -gravity center -extent ${overlayWidth}x${overlayHeight}`;
         } else if (overlayImageFit === "contain") {
-          resizeMode = `${frameWidth}x${frameHeight}`;
+          resizeMode = `${overlayWidth}x${overlayHeight}`;
         } else {
-          resizeMode = `${frameWidth}x${frameHeight}!`;
+          resizeMode = `${overlayWidth}x${overlayHeight}!`;
         }
         
-        const resizeBgCmd = `convert "${bgImagePath}" -resize ${resizeMode} "${compositePath}"`;
+        const resizeBgCmd = `convert "${bgImagePath}" -resize ${resizeMode} "${overlayPanelPath}"`;
         await execAsync(resizeBgCmd, { maxBuffer: 50 * 1024 * 1024 });
       } else {
-        const createBgCmd = `convert -size ${frameWidth}x${frameHeight} xc:black "${compositePath}"`;
-        await execAsync(createBgCmd, { maxBuffer: 50 * 1024 * 1024 });
+        const createPanelCmd = `convert -size ${overlayWidth}x${overlayHeight} xc:"${overlayColor}" -alpha set -channel RGBA -background none -fill "${overlayColor}" -draw "roundrectangle 0,0 ${overlayWidth},${overlayHeight} ${borderRadius},${borderRadius}" "${overlayPanelPath}"`;
+        await execAsync(createPanelCmd, { maxBuffer: 50 * 1024 * 1024 });
       }
       
-      const finalCompositeCmd = `convert "${compositePath}" "${overlayPanelPath}" -geometry +${overlayX}+${overlayY} -composite "${outputPath}"`;
+      const resizeQrCmd = `convert "${qrPath}" -resize ${qrScale}x${qrScale}! "${qrPath}"`;
+      await execAsync(resizeQrCmd, { maxBuffer: 50 * 1024 * 1024 });
       
-      console.log(`[OverlayProcessor] Generating static PNG overlay with${ctaText ? '' : 'out'} CTA text and ${borderRadius}px border radius`);
-      await execAsync(finalCompositeCmd, { maxBuffer: 50 * 1024 * 1024 });
+      const overlayQrCmd = `convert "${overlayPanelPath}" "${qrPath}" -geometry +${qrX}+${qrY} -composite "${overlayPanelPath}"`;
+      await execAsync(overlayQrCmd, { maxBuffer: 50 * 1024 * 1024 });
+      
+      if (ctaText && ctaText.trim()) {
+        const textY = qrY + qrScale + 40;
+        const addTextCmd = `convert "${overlayPanelPath}" -font DejaVu-Sans-Bold -pointsize ${textSize} -fill "${textColor}" -gravity North -annotate +0+${textY} "${ctaText.replace(/"/g, '\\"')}" "${overlayPanelPath}"`;
+        await execAsync(addTextCmd, { maxBuffer: 50 * 1024 * 1024 });
+      }
+      
+      const copyToOutputCmd = `cp "${overlayPanelPath}" "${outputPath}"`;
+      
+      console.log(`[OverlayProcessor] Generating ${overlayWidth}x${overlayHeight} overlay banner with${ctaText ? '' : 'out'} CTA text and ${borderRadius}px border radius`);
+      await execAsync(copyToOutputCmd, { maxBuffer: 50 * 1024 * 1024 });
 
       await this.storage.updateOverlayRendition(overlay.id, {
         status: "completed",
