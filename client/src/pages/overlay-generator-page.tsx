@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ export default function OverlayGeneratorPage() {
   const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
   const [overlayBackgroundImage, setOverlayBackgroundImage] = useState<string>("");
   const [overlayImageFit, setOverlayImageFit] = useState<"cover" | "contain" | "stretch">("cover");
+  const [overlayWidth, setOverlayWidth] = useState<number>(1080);
+  const [overlayHeight, setOverlayHeight] = useState<number>(400);
   
   const [qrBounds, setQrBounds] = useState<{x: number, y: number, size: number} | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -52,6 +54,21 @@ export default function OverlayGeneratorPage() {
   const platformConfig = Object.values(PLATFORM_PRESETS).find(
     (p) => p.id === selectedPlatform
   );
+
+  const effectivePlatformConfig = useMemo(() => {
+    if (!platformConfig) return null;
+    return {
+      ...platformConfig,
+      width: overlayWidth,
+      height: overlayHeight,
+      safeZone: {
+        top: Math.round((platformConfig.safeZone.top / platformConfig.height) * overlayHeight),
+        bottom: Math.round((platformConfig.safeZone.bottom / platformConfig.height) * overlayHeight),
+        left: Math.round((platformConfig.safeZone.left / platformConfig.width) * overlayWidth),
+        right: Math.round((platformConfig.safeZone.right / platformConfig.width) * overlayWidth),
+      }
+    };
+  }, [platformConfig, overlayWidth, overlayHeight]);
 
   const selectedScan = scans?.find((s) => s.id === selectedQR);
   const selectedFrame = templates?.find((t) => t.id === selectedTemplate);
@@ -193,7 +210,7 @@ export default function OverlayGeneratorPage() {
     const scan = scans?.find((s) => s.id === selectedQR);
     const frame = templates?.find((t) => t.id === selectedTemplate);
     
-    if (!scan || !frame || !platformConfig) {
+    if (!scan || !frame || !effectivePlatformConfig) {
       setPreviewUrl("");
       setQrBounds(null);
       return;
@@ -209,8 +226,8 @@ export default function OverlayGeneratorPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        canvas.width = platformConfig.width;
-        canvas.height = platformConfig.height;
+        canvas.width = overlayWidth;
+        canvas.height = overlayHeight;
 
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
         gradient.addColorStop(0, "#1a1a1a");
@@ -239,7 +256,7 @@ export default function OverlayGeneratorPage() {
           return;
         }
 
-        const { scaledOverlay, scaledQR, scaledCTA } = scaleOverlayForPlatform(templateData, safeArea, platformConfig);
+        const { scaledOverlay, scaledQR, scaledCTA } = scaleOverlayForPlatform(templateData, safeArea, effectivePlatformConfig);
         const effectiveBorderRadius = borderRadius >= 0 ? borderRadius : templateData.overlay.borderRadius;
         
         ctx.save();
@@ -357,7 +374,7 @@ export default function OverlayGeneratorPage() {
     generatePreview();
   }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates, 
       textFont, textSize, textColor, qrSizeModifier, qrXOffset, qrYOffset, overlayColor,
-      overlayBackgroundImage, overlayImageFit]);
+      overlayBackgroundImage, overlayImageFit, overlayWidth, overlayHeight]);
 
   const handleOverlayImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -625,6 +642,96 @@ export default function OverlayGeneratorPage() {
                   </div>
 
                   <div className="border-t pt-4">
+                    <h4 className="font-semibold text-sm mb-3">Banner Size</h4>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="overlay-width">Width (px)</Label>
+                          <Input
+                            id="overlay-width"
+                            type="number"
+                            min={300}
+                            max={1920}
+                            value={overlayWidth}
+                            onChange={(e) => {
+                              const value = Number(e.target.value);
+                              if (value >= 300 && value <= 1920) {
+                                setOverlayWidth(value);
+                              } else if (value < 300) {
+                                setOverlayWidth(300);
+                              } else if (value > 1920) {
+                                setOverlayWidth(1920);
+                              }
+                            }}
+                            data-testid="input-overlay-width"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="overlay-height">Height (px)</Label>
+                          <Input
+                            id="overlay-height"
+                            type="number"
+                            min={100}
+                            max={1920}
+                            value={overlayHeight}
+                            onChange={(e) => {
+                              const value = Number(e.target.value);
+                              if (value >= 100 && value <= 1920) {
+                                setOverlayHeight(value);
+                              } else if (value < 100) {
+                                setOverlayHeight(100);
+                              } else if (value > 1920) {
+                                setOverlayHeight(1920);
+                              }
+                            }}
+                            data-testid="input-overlay-height"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setOverlayWidth(1080); setOverlayHeight(400); }}
+                          data-testid="button-size-banner"
+                        >
+                          Banner (1080x400)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setOverlayWidth(1080); setOverlayHeight(600); }}
+                          data-testid="button-size-tall"
+                        >
+                          Tall (1080x600)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setOverlayWidth(1080); setOverlayHeight(1080); }}
+                          data-testid="button-size-square"
+                        >
+                          Square (1080x1080)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setOverlayWidth(1080); setOverlayHeight(1920); }}
+                          data-testid="button-size-fullscreen"
+                        >
+                          Full (1080x1920)
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
                     <h4 className="font-semibold text-sm mb-3">Text Styling</h4>
                     
                     <div className="space-y-4">
@@ -754,6 +861,8 @@ export default function OverlayGeneratorPage() {
                       setOverlayColor("#9333EA");
                       setOverlayBackgroundImage("");
                       setOverlayImageFit("cover");
+                      setOverlayWidth(1080);
+                      setOverlayHeight(400);
                       setBorderRadius(0);
                     }}
                     data-testid="button-reset-styles"
