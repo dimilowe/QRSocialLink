@@ -97,6 +97,8 @@ export class OverlayProcessor {
         overlayWidth = 800,
         overlayHeight = 300,
         overlayColor = "#9333ea",
+        overlayBackgroundImage = "",
+        overlayImageFit = "cover",
         qrXOffset = 0,
         qrYOffset = 0,
         qrSizeModifier = 1,
@@ -163,8 +165,39 @@ export class OverlayProcessor {
         await execAsync(addTextCmd, { maxBuffer: 50 * 1024 * 1024 });
       }
       
-      const createBgCmd = `convert -size ${frameWidth}x${frameHeight} xc:black "${compositePath}"`;
-      await execAsync(createBgCmd, { maxBuffer: 50 * 1024 * 1024 });
+      if (overlayBackgroundImage && overlayBackgroundImage.trim()) {
+        const bgImagePath = path.join(tempDir, "bg-image.png");
+        
+        if (overlayBackgroundImage.startsWith('http://') || overlayBackgroundImage.startsWith('https://')) {
+          const bgResponse = await fetch(overlayBackgroundImage);
+          if (!bgResponse.ok) {
+            throw new Error(`Failed to fetch background image: ${bgResponse.statusText}`);
+          }
+          const bgBuffer = Buffer.from(await bgResponse.arrayBuffer());
+          await fs.writeFile(bgImagePath, bgBuffer);
+        } else {
+          const bgData = overlayBackgroundImage.startsWith('data:') 
+            ? overlayBackgroundImage.split(',')[1]
+            : overlayBackgroundImage;
+          const bgBuffer = Buffer.from(bgData, 'base64');
+          await fs.writeFile(bgImagePath, bgBuffer);
+        }
+        
+        let resizeMode = "";
+        if (overlayImageFit === "cover") {
+          resizeMode = `${frameWidth}x${frameHeight}^ -gravity center -extent ${frameWidth}x${frameHeight}`;
+        } else if (overlayImageFit === "contain") {
+          resizeMode = `${frameWidth}x${frameHeight}`;
+        } else {
+          resizeMode = `${frameWidth}x${frameHeight}!`;
+        }
+        
+        const resizeBgCmd = `convert "${bgImagePath}" -resize ${resizeMode} "${compositePath}"`;
+        await execAsync(resizeBgCmd, { maxBuffer: 50 * 1024 * 1024 });
+      } else {
+        const createBgCmd = `convert -size ${frameWidth}x${frameHeight} xc:black "${compositePath}"`;
+        await execAsync(createBgCmd, { maxBuffer: 50 * 1024 * 1024 });
+      }
       
       const finalCompositeCmd = `convert "${compositePath}" "${overlayPanelPath}" -geometry +${overlayX}+${overlayY} -composite "${outputPath}"`;
       
