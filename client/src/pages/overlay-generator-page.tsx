@@ -55,20 +55,6 @@ export default function OverlayGeneratorPage() {
     (p) => p.id === selectedPlatform
   );
 
-  const effectivePlatformConfig = useMemo(() => {
-    if (!platformConfig) return null;
-    return {
-      ...platformConfig,
-      width: overlayWidth,
-      height: overlayHeight,
-      safeZone: {
-        top: Math.round((platformConfig.safeZone.top / platformConfig.height) * overlayHeight),
-        bottom: Math.round((platformConfig.safeZone.bottom / platformConfig.height) * overlayHeight),
-        left: Math.round((platformConfig.safeZone.left / platformConfig.width) * overlayWidth),
-        right: Math.round((platformConfig.safeZone.right / platformConfig.width) * overlayWidth),
-      }
-    };
-  }, [platformConfig, overlayWidth, overlayHeight]);
 
   const selectedScan = scans?.find((s) => s.id === selectedQR);
   const selectedFrame = templates?.find((t) => t.id === selectedTemplate);
@@ -89,7 +75,7 @@ export default function OverlayGeneratorPage() {
     }
   }, [selectedFrame]);
 
-  const scaleOverlayForPlatform = (templateData: any, safeArea: any, platformConfig: any) => {
+  const scaleOverlayForPlatform = (templateData: any, safeArea: any, platformConfig: any, bannerDimensions?: {width: number, height: number} | null) => {
     const BASE_WIDTH = 1080;
     const BASE_HEIGHT = 1920;
     
@@ -103,33 +89,33 @@ export default function OverlayGeneratorPage() {
     let scaledQR = { ...safeArea.qr };
     let scaledCTA = { ...safeArea.cta };
     
-    if (position === "banner-top") {
-      scaledOverlay.x = 0;
-      scaledOverlay.y = 0;
-      scaledOverlay.width = platformConfig.width;
-      scaledOverlay.height = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
+    if (position === "banner-top" || position === "banner-bottom") {
+      const baseScaledHeight = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
+      const effectiveWidth = bannerDimensions?.width ?? platformConfig.width;
+      const effectiveHeight = bannerDimensions?.height ?? baseScaledHeight;
+      const offsetX = Math.max(0, Math.round((platformConfig.width - effectiveWidth) / 2));
       
-      scaledQR.x = 40;
-      scaledQR.y = isHorizontal ? 50 : Math.round(safeArea.qr.y * scaleY);
-      scaledQR.size = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
+      const qrRatio = effectiveHeight / baseScaledHeight;
+      const widthRatio = effectiveWidth / platformConfig.width;
       
-      scaledCTA.x = scaledQR.x + scaledQR.size + 30;
+      scaledOverlay.x = offsetX;
+      scaledOverlay.width = effectiveWidth;
+      scaledOverlay.height = effectiveHeight;
+      
+      if (position === "banner-top") {
+        scaledOverlay.y = platformConfig.safeZone?.top ?? 0;
+      } else {
+        scaledOverlay.y = platformConfig.height - effectiveHeight - (platformConfig.safeZone?.bottom ?? 0);
+      }
+      
+      const baseQrSize = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
+      scaledQR.size = Math.round(Math.max(80, baseQrSize * qrRatio));
+      scaledQR.x = offsetX + Math.round(40 * widthRatio);
+      scaledQR.y = scaledOverlay.y + Math.round((isHorizontal ? 50 : 40) * qrRatio);
+      
+      scaledCTA.x = scaledQR.x + scaledQR.size + Math.round(30 * widthRatio);
       scaledCTA.y = scaledQR.y;
-      scaledCTA.width = platformConfig.width - scaledCTA.x - 40;
-      scaledCTA.height = scaledQR.size;
-    } else if (position === "banner-bottom") {
-      scaledOverlay.x = 0;
-      scaledOverlay.y = isHorizontal ? platformConfig.height - 200 : platformConfig.height - Math.round(templateData.overlay.height * scaleY);
-      scaledOverlay.width = platformConfig.width;
-      scaledOverlay.height = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
-      
-      scaledQR.x = 40;
-      scaledQR.y = scaledOverlay.y + (isHorizontal ? 30 : 40);
-      scaledQR.size = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
-      
-      scaledCTA.x = scaledQR.x + scaledQR.size + 30;
-      scaledCTA.y = scaledQR.y;
-      scaledCTA.width = platformConfig.width - scaledCTA.x - 40;
+      scaledCTA.width = Math.round(effectiveWidth - (scaledQR.size + 70 * widthRatio));
       scaledCTA.height = scaledQR.size;
     } else if (position.startsWith("corner-")) {
       const overlaySize = isHorizontal ? Math.min(350, platformConfig.height * 0.4) : Math.round(templateData.overlay.width * scaleX);
@@ -210,7 +196,7 @@ export default function OverlayGeneratorPage() {
     const scan = scans?.find((s) => s.id === selectedQR);
     const frame = templates?.find((t) => t.id === selectedTemplate);
     
-    if (!scan || !frame || !effectivePlatformConfig) {
+    if (!scan || !frame || !platformConfig) {
       setPreviewUrl("");
       setQrBounds(null);
       return;
@@ -226,8 +212,8 @@ export default function OverlayGeneratorPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        canvas.width = overlayWidth;
-        canvas.height = overlayHeight;
+        canvas.width = platformConfig.width;
+        canvas.height = platformConfig.height;
 
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
         gradient.addColorStop(0, "#1a1a1a");
@@ -256,7 +242,12 @@ export default function OverlayGeneratorPage() {
           return;
         }
 
-        const { scaledOverlay, scaledQR, scaledCTA } = scaleOverlayForPlatform(templateData, safeArea, effectivePlatformConfig);
+        const bannerDimensions = templateData.position.startsWith("banner-") ? {
+          width: overlayWidth,
+          height: overlayHeight
+        } : null;
+        
+        const { scaledOverlay, scaledQR, scaledCTA } = scaleOverlayForPlatform(templateData, safeArea, platformConfig, bannerDimensions);
         const effectiveBorderRadius = borderRadius >= 0 ? borderRadius : templateData.overlay.borderRadius;
         
         ctx.save();
@@ -642,7 +633,10 @@ export default function OverlayGeneratorPage() {
                   </div>
 
                   <div className="border-t pt-4">
-                    <h4 className="font-semibold text-sm mb-3">Banner Size</h4>
+                    <div className="space-y-1 mb-3">
+                      <h4 className="font-semibold text-sm">Banner Dimensions</h4>
+                      <p className="text-xs text-muted-foreground">Customize banner overlay size (applies to Banner templates only)</p>
+                    </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-3">
