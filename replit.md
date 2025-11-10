@@ -87,6 +87,8 @@ This configuration has been battle-tested and resolves SSL certificate issues th
     - Coordinate translation between display scale and canvas dimensions for pixel-perfect positioning
     - Diagonal-based resize calculation ensures smooth handle tracking across all corners
     - Size normalization prevents jumps when resizing (uses actual rendered size as baseline)
+    - **Percentage-Based QR Offset System**: QR positions stored as percentages of overlay dimensions (`qrOffsetPercent` as source of truth) to preserve relative positioning when switching platforms/aspect ratios. Central `updateQrOffset()` helper synchronizes percent and pixel state atomically. Pending-offsets mechanism ensures saved overlays hydrate correctly after frame/platform data loads.
+    - **Banner Selection Fix**: Hit-testing uses canvas coordinates instead of mixing coordinate systems, preventing mismatches between cursor position and rendered geometry.
   - Authenticated overlay endpoints with Zod validation for data integrity.
   - Database schema: overlayRenditions table stores generated overlays with status tracking, frames table holds template metadata.
   - **Background Processing & Rendering**:
