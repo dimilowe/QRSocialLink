@@ -294,11 +294,13 @@ export default function OverlayGeneratorPage() {
         
         ctx.save();
         
+        ctx.beginPath();
         if (effectiveBorderRadius > 0) {
-          ctx.beginPath();
           ctx.roundRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height, effectiveBorderRadius);
-          ctx.clip();
+        } else {
+          ctx.rect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
         }
+        ctx.clip();
         
         if (overlayBackgroundImage) {
           try {
