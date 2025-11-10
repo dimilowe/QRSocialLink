@@ -91,8 +91,8 @@ export default function OverlayGeneratorPage() {
     
     if (position === "banner-top" || position === "banner-bottom") {
       const baseScaledHeight = isHorizontal ? 200 : Math.round(templateData.overlay.height * scaleY);
-      const effectiveWidth = bannerDimensions?.width ?? platformConfig.width;
-      const effectiveHeight = bannerDimensions?.height ?? baseScaledHeight;
+      const effectiveWidth = Math.min(platformConfig.width, bannerDimensions?.width ?? platformConfig.width);
+      const effectiveHeight = Math.min(platformConfig.height, bannerDimensions?.height ?? baseScaledHeight);
       const offsetX = Math.max(0, Math.round((platformConfig.width - effectiveWidth) / 2));
       
       const qrRatio = effectiveHeight / baseScaledHeight;
@@ -108,14 +108,33 @@ export default function OverlayGeneratorPage() {
         scaledOverlay.y = platformConfig.height - effectiveHeight - (platformConfig.safeZone?.bottom ?? 0);
       }
       
+      const leftMargin = Math.round(40 * widthRatio);
+      const rightMargin = Math.round(40 * widthRatio);
+      const qrCtaGap = Math.round(30 * widthRatio);
+      
       const baseQrSize = isHorizontal ? 140 : Math.round(safeArea.qr.size * scaleY);
-      scaledQR.size = Math.round(Math.max(80, baseQrSize * qrRatio));
-      scaledQR.x = offsetX + Math.round(40 * widthRatio);
+      let idealQrSize = Math.round(Math.max(80, baseQrSize * qrRatio));
+      
+      const maxAvailableQrWidth = effectiveWidth - leftMargin - rightMargin - qrCtaGap - 50;
+      let qrSize = Math.min(idealQrSize, maxAvailableQrWidth);
+      qrSize = Math.max(40, qrSize);
+      
+      if (qrSize > effectiveWidth * 0.7) {
+        qrSize = Math.round(effectiveWidth * 0.5);
+      }
+      
+      scaledQR.size = Math.min(qrSize, effectiveWidth - leftMargin - rightMargin);
+      scaledQR.x = offsetX + leftMargin;
       scaledQR.y = scaledOverlay.y + Math.round((isHorizontal ? 50 : 40) * qrRatio);
       
-      scaledCTA.x = scaledQR.x + scaledQR.size + Math.round(30 * widthRatio);
+      const idealCtaX = scaledQR.x + scaledQR.size + qrCtaGap;
+      const maxCtaRight = offsetX + effectiveWidth - rightMargin;
+      const minCtaX = offsetX + leftMargin;
+      
+      scaledCTA.x = Math.max(minCtaX, Math.min(idealCtaX, maxCtaRight));
       scaledCTA.y = scaledQR.y;
-      scaledCTA.width = Math.round(effectiveWidth - (scaledQR.size + 70 * widthRatio));
+      const availableCtaWidth = Math.max(0, maxCtaRight - scaledCTA.x);
+      scaledCTA.width = Math.min(800, availableCtaWidth);
       scaledCTA.height = scaledQR.size;
     } else if (position.startsWith("corner-")) {
       const overlaySize = isHorizontal ? Math.min(350, platformConfig.height * 0.4) : Math.round(templateData.overlay.width * scaleX);
