@@ -29,6 +29,8 @@ export default function OverlayGeneratorPage() {
   const [textSize, setTextSize] = useState<number>(42);
   const [textColor, setTextColor] = useState<string>("#FFFFFF");
   const [qrSizeModifier, setQrSizeModifier] = useState<number>(100);
+  const [qrOffsetPercent, setQrOffsetPercent] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [qrOffsetPx, setQrOffsetPx] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [qrXOffset, setQrXOffset] = useState<number>(0);
   const [qrYOffset, setQrYOffset] = useState<number>(0);
   const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
@@ -149,8 +151,11 @@ export default function OverlayGeneratorPage() {
       if (config.textSize !== undefined) setTextSize(config.textSize);
       if (config.textColor) setTextColor(config.textColor);
       if (config.qrSizeModifier !== undefined) setQrSizeModifier(config.qrSizeModifier);
-      if (config.qrXOffset !== undefined) setQrXOffset(config.qrXOffset);
-      if (config.qrYOffset !== undefined) setQrYOffset(config.qrYOffset);
+      if (config.qrXOffset !== undefined || config.qrYOffset !== undefined) {
+        const xOffset = config.qrXOffset ?? 0;
+        const yOffset = config.qrYOffset ?? 0;
+        setTimeout(() => updateQrOffset({ px: { x: xOffset, y: yOffset } }), 100);
+      }
       if (config.overlayColor) setOverlayColor(config.overlayColor);
       if (config.overlayBackgroundImage) setOverlayBackgroundImage(config.overlayBackgroundImage);
       if (config.overlayImageFit) setOverlayImageFit(config.overlayImageFit);
@@ -185,6 +190,81 @@ export default function OverlayGeneratorPage() {
       setBorderRadius(0);
     }
   }, [selectedFrame]);
+
+  useEffect(() => {
+    if (!selectedFrame || !platformConfig) {
+      setQrOffsetPx({ x: 0, y: 0 });
+      setQrXOffset(0);
+      setQrYOffset(0);
+      return;
+    }
+
+    try {
+      const templateData = JSON.parse(selectedFrame.srcPath);
+      const safeArea = JSON.parse(selectedFrame.safeArea);
+      const bannerDimensions = templateData.position.startsWith("banner-") ? {
+        width: overlayWidth,
+        height: overlayHeight
+      } : null;
+
+      const { scaledOverlay } = scaleOverlayForPlatform(templateData, safeArea, platformConfig, bannerDimensions);
+      
+      const overlayWidthForCalc = scaledOverlay.width || platformConfig.width;
+      const overlayHeightForCalc = scaledOverlay.height || platformConfig.height;
+      
+      const pixelX = qrOffsetPercent.x * overlayWidthForCalc;
+      const pixelY = qrOffsetPercent.y * overlayHeightForCalc;
+      
+      setQrOffsetPx({ x: pixelX, y: pixelY });
+      setQrXOffset(pixelX);
+      setQrYOffset(pixelY);
+    } catch (e) {
+      console.error("Failed to recalculate QR offsets:", e);
+    }
+  }, [selectedFrame, platformConfig, qrOffsetPercent, overlayWidth, overlayHeight]);
+
+  const updateQrOffset = (params: { px?: { x: number; y: number }; percent?: { x: number; y: number } }) => {
+    if (!selectedFrame || !platformConfig) return;
+    
+    try {
+      const templateData = JSON.parse(selectedFrame.srcPath);
+      const safeArea = JSON.parse(selectedFrame.safeArea);
+      const bannerDimensions = templateData.position.startsWith("banner-") ? {
+        width: overlayWidth,
+        height: overlayHeight
+      } : null;
+      
+      const { scaledOverlay } = scaleOverlayForPlatform(templateData, safeArea, platformConfig, bannerDimensions);
+      const overlayWidthForCalc = scaledOverlay.width || platformConfig.width;
+      const overlayHeightForCalc = scaledOverlay.height || platformConfig.height;
+      
+      let pixelOffset: { x: number; y: number };
+      let percentOffset: { x: number; y: number };
+      
+      if (params.px) {
+        pixelOffset = params.px;
+        percentOffset = {
+          x: pixelOffset.x / (overlayWidthForCalc || 1),
+          y: pixelOffset.y / (overlayHeightForCalc || 1)
+        };
+      } else if (params.percent) {
+        percentOffset = params.percent;
+        pixelOffset = {
+          x: percentOffset.x * overlayWidthForCalc,
+          y: percentOffset.y * overlayHeightForCalc
+        };
+      } else {
+        return;
+      }
+      
+      setQrOffsetPercent(percentOffset);
+      setQrOffsetPx(pixelOffset);
+      setQrXOffset(pixelOffset.x);
+      setQrYOffset(pixelOffset.y);
+    } catch (e) {
+      console.error("Failed to update QR offset:", e);
+    }
+  };
 
   const scaleOverlayForPlatform = (templateData: any, safeArea: any, platformConfig: any, bannerDimensions?: {width: number, height: number} | null) => {
     const BASE_WIDTH = 1080;
@@ -579,23 +659,30 @@ export default function OverlayGeneratorPage() {
     }
     
     // Priority 2: Check if clicking on banner overlay (banner templates only)
-    if (isBannerTemplate) {
-      const overlayBounds = getOverlayBounds();
+    if (isBannerTemplate && platformConfig) {
+      const effectiveWidth = Math.min(platformConfig.width, overlayWidth);
+      const effectiveHeight = Math.min(platformConfig.height, overlayHeight);
+      const offsetX = Math.max(0, Math.round((platformConfig.width - effectiveWidth) / 2));
       
-      if (overlayBounds) {
-        const isInOverlay = 
-          clickX >= overlayBounds.x &&
-          clickX <= overlayBounds.x + overlayBounds.width &&
-          clickY >= overlayBounds.y &&
-          clickY <= overlayBounds.y + overlayBounds.height;
-        
-        if (isInOverlay) {
-          e.preventDefault();
-          e.stopPropagation();
-          setIsBannerSelected(true);
-          setIsQrSelected(false);
-          return;
-        }
+      let overlayY = 0;
+      if (selectedFramePosition === "banner-top") {
+        overlayY = platformConfig.safeZone?.top ?? 0;
+      } else {
+        overlayY = platformConfig.height - effectiveHeight - (platformConfig.safeZone?.bottom ?? 0);
+      }
+      
+      const isInOverlay = 
+        canvasX >= offsetX &&
+        canvasX <= offsetX + effectiveWidth &&
+        canvasY >= overlayY &&
+        canvasY <= overlayY + effectiveHeight;
+      
+      if (isInOverlay) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsBannerSelected(true);
+        setIsQrSelected(false);
+        return;
       }
     }
     
@@ -634,8 +721,7 @@ export default function OverlayGeneratorPage() {
       const deltaX = newX - scaledQR.x;
       const deltaY = newY - scaledQR.y;
       
-      setQrXOffset(deltaX);
-      setQrYOffset(deltaY);
+      updateQrOffset({ px: { x: deltaX, y: deltaY } });
     });
   };
 
@@ -755,8 +841,7 @@ export default function OverlayGeneratorPage() {
       const newYOffset = newQrY - scaledQR.y;
       
       setQrSizeModifier(newSizeModifier);
-      setQrXOffset(newXOffset);
-      setQrYOffset(newYOffset);
+      updateQrOffset({ px: { x: newXOffset, y: newYOffset } });
     });
   };
 
@@ -1300,7 +1385,7 @@ export default function OverlayGeneratorPage() {
                           max={200}
                           step={10}
                           value={[qrXOffset]}
-                          onValueChange={(value) => setQrXOffset(value[0])}
+                          onValueChange={(value) => updateQrOffset({ px: { x: value[0], y: qrYOffset } })}
                           data-testid="slider-qr-x"
                         />
                       </div>
@@ -1316,7 +1401,7 @@ export default function OverlayGeneratorPage() {
                           max={200}
                           step={10}
                           value={[qrYOffset]}
-                          onValueChange={(value) => setQrYOffset(value[0])}
+                          onValueChange={(value) => updateQrOffset({ px: { x: qrXOffset, y: value[0] } })}
                           data-testid="slider-qr-y"
                         />
                       </div>
