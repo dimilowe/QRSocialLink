@@ -27,13 +27,14 @@ export default function OverlayGeneratorPage() {
   const [qrYOffset, setQrYOffset] = useState<number>(0);
   const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
   
+  const [qrBounds, setQrBounds] = useState<{x: number, y: number, size: number} | null>(null);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const isDraggingRef = useRef<boolean>(false);
-  const isResizingRef = useRef<boolean>(false);
-  const dragStartRef = useRef<{x: number, y: number} | null>(null);
-  const resizeHandleRef = useRef<string | null>(null);
-  const qrBoundsRef = useRef<{x: number, y: number, size: number} | null>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: scans } = useQuery<Scan[]>({
     queryKey: ["/api/scans"],
@@ -183,18 +184,17 @@ export default function OverlayGeneratorPage() {
     return { scaledOverlay, scaledQR, scaledCTA };
   };
 
-  const renderPreview = useRef<() => Promise<void>>(async () => {});
-
   useEffect(() => {
     const scan = scans?.find((s) => s.id === selectedQR);
     const frame = templates?.find((t) => t.id === selectedTemplate);
     
     if (!scan || !frame || !platformConfig) {
       setPreviewUrl("");
+      setQrBounds(null);
       return;
     }
 
-    renderPreview.current = async () => {
+    const generatePreview = async () => {
       try {
         const qrDataUrl = scan.qrImageUrl;
 
@@ -263,7 +263,7 @@ export default function OverlayGeneratorPage() {
 
         ctx.drawImage(qrImage, qrXAdjusted, qrYAdjusted, qrSizeAdjusted, qrSizeAdjusted);
         
-        qrBoundsRef.current = { x: qrXAdjusted, y: qrYAdjusted, size: qrSizeAdjusted };
+        setQrBounds({ x: qrXAdjusted, y: qrYAdjusted, size: qrSizeAdjusted });
 
         if (ctaText && scaledCTA) {
           const brightness = parseInt(textColor.slice(1, 3), 16) * 0.299 + 
@@ -286,147 +286,15 @@ export default function OverlayGeneratorPage() {
           ctx.fillText(ctaText, textX, textY);
         }
 
-        if (qrBoundsRef.current) {
-          const qrBounds = qrBoundsRef.current;
-          const handleSize = 12;
-          const handles = [
-            { x: qrBounds.x, y: qrBounds.y },
-            { x: qrBounds.x + qrBounds.size, y: qrBounds.y },
-            { x: qrBounds.x, y: qrBounds.y + qrBounds.size },
-            { x: qrBounds.x + qrBounds.size, y: qrBounds.y + qrBounds.size },
-          ];
-
-          ctx.strokeStyle = "#FFFFFF";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(qrBounds.x - 2, qrBounds.y - 2, qrBounds.size + 4, qrBounds.size + 4);
-
-          handles.forEach(handle => {
-            ctx.fillStyle = "#9333EA";
-            ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
-            ctx.strokeStyle = "#FFFFFF";
-            ctx.strokeRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize);
-          });
-        }
-
         setPreviewUrl(canvas.toDataURL("image/png"));
       } catch (error) {
         console.error("Preview generation error:", error);
       }
     };
 
-    renderPreview.current();
+    generatePreview();
   }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates, 
       textFont, textSize, textColor, qrSizeModifier, qrXOffset, qrYOffset, overlayColor]);
-
-  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const hitTestHandle = (x: number, y: number) => {
-    if (!qrBoundsRef.current) return null;
-
-    const qrBounds = qrBoundsRef.current;
-    const handleSize = 12;
-    const handles = [
-      { x: qrBounds.x, y: qrBounds.y, position: "tl" },
-      { x: qrBounds.x + qrBounds.size, y: qrBounds.y, position: "tr" },
-      { x: qrBounds.x, y: qrBounds.y + qrBounds.size, position: "bl" },
-      { x: qrBounds.x + qrBounds.size, y: qrBounds.y + qrBounds.size, position: "br" },
-    ];
-
-    for (const handle of handles) {
-      if (Math.abs(x - handle.x) < handleSize && Math.abs(y - handle.y) < handleSize) {
-        return handle.position;
-      }
-    }
-    return null;
-  };
-
-  const hitTestQR = (x: number, y: number) => {
-    if (!qrBoundsRef.current) return false;
-    const qrBounds = qrBoundsRef.current;
-    return x >= qrBounds.x && x <= qrBounds.x + qrBounds.size &&
-           y >= qrBounds.y && y <= qrBounds.y + qrBounds.size;
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCanvasCoordinates(e);
-    if (!coords) return;
-
-    const handle = hitTestHandle(coords.x, coords.y);
-    if (handle) {
-      isResizingRef.current = true;
-      resizeHandleRef.current = handle;
-      dragStartRef.current = coords;
-      return;
-    }
-
-    if (hitTestQR(coords.x, coords.y)) {
-      isDraggingRef.current = true;
-      dragStartRef.current = coords;
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCanvasCoordinates(e);
-    if (!coords || !dragStartRef.current || !qrBoundsRef.current) {
-      updateCursor(e);
-      return;
-    }
-
-    if (isDraggingRef.current) {
-      const deltaX = coords.x - dragStartRef.current.x;
-      const deltaY = coords.y - dragStartRef.current.y;
-      setQrXOffset(prev => prev + deltaX);
-      setQrYOffset(prev => prev + deltaY);
-      dragStartRef.current = coords;
-    } else if (isResizingRef.current && resizeHandleRef.current) {
-      const deltaX = coords.x - dragStartRef.current.x;
-      const deltaY = coords.y - dragStartRef.current.y;
-      const avgDelta = (deltaX + deltaY) / 2;
-      const sizeChange = (avgDelta / qrBoundsRef.current.size) * 100;
-      
-      setQrSizeModifier(prev => Math.max(50, Math.min(150, prev + sizeChange)));
-      dragStartRef.current = coords;
-    }
-  };
-
-  const handleMouseUp = () => {
-    isDraggingRef.current = false;
-    isResizingRef.current = false;
-    dragStartRef.current = null;
-    resizeHandleRef.current = null;
-  };
-
-  const updateCursor = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCanvasCoordinates(e);
-    if (!coords || !canvasRef.current) return;
-
-    const handle = hitTestHandle(coords.x, coords.y);
-    if (handle) {
-      const cursors: Record<string, string> = {
-        tl: "nwse-resize",
-        tr: "nesw-resize",
-        bl: "nesw-resize",
-        br: "nwse-resize",
-      };
-      canvasRef.current.style.cursor = cursors[handle] || "default";
-    } else if (hitTestQR(coords.x, coords.y)) {
-      canvasRef.current.style.cursor = "move";
-    } else {
-      canvasRef.current.style.cursor = "default";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-4">
