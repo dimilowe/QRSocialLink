@@ -75,6 +75,12 @@ export default function OverlayGeneratorPage() {
     queryKey: ["/api/overlay-templates"],
   });
 
+  const { data: overlays } = useQuery<OverlayRendition[]>({
+    queryKey: ["/api/overlays"],
+  });
+
+  const latestOverlay = overlays?.[0];
+
   const generateOverlayMutation = useMutation({
     mutationFn: async (data: InsertOverlayRendition) => {
       const response = await apiRequest("POST", "/api/overlays/generate", data);
@@ -1540,11 +1546,20 @@ export default function OverlayGeneratorPage() {
                     variant="outline"
                     className="w-full"
                     size="lg"
-                    disabled
+                    disabled={!latestOverlay || latestOverlay.status !== "completed"}
+                    onClick={() => {
+                      if (latestOverlay?.outputPath) {
+                        window.open(latestOverlay.outputPath, '_blank');
+                      }
+                    }}
                     data-testid="button-download"
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Download MP4
+                    {!latestOverlay ? "Generate First" : 
+                     latestOverlay.status === "queued" ? "Queued..." :
+                     latestOverlay.status === "rendering" ? "Rendering..." :
+                     latestOverlay.status === "failed" ? "Failed" :
+                     "Download Overlay"}
                   </Button>
                 </div>
               </CardContent>

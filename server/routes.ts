@@ -1255,6 +1255,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/overlays/:id/download", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const overlayId = req.params.id;
+      const overlay = await storage.getOverlayRendition(overlayId);
+      
+      if (!overlay) {
+        return res.status(404).json({ message: "Overlay not found" });
+      }
+
+      const scan = await storage.getScan(overlay.scanId);
+      if (!scan || scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (overlay.status !== "completed") {
+        return res.status(400).json({ 
+          message: `Overlay is ${overlay.status}. Please wait for processing to complete.`,
+          status: overlay.status
+        });
+      }
+
+      const { overlayProcessor } = req.app.locals;
+      if (!overlayProcessor) {
+        return res.status(500).json({ message: "Overlay processor not initialized" });
+      }
+
+      const filePath = await overlayProcessor.getOutputPath(overlayId);
+      if (!filePath) {
+        return res.status(404).json({ message: "Overlay file not found" });
+      }
+
+      res.sendFile(filePath);
+    } catch (error: any) {
+      console.error("Download overlay error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/overlays/generate", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });

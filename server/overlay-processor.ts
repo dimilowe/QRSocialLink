@@ -141,7 +141,7 @@ export class OverlayProcessor {
       filterComplex += `[overlay][qr]overlay=${qrX}:${qrY}[overlay_with_qr];`;
       filterComplex += `[bg][overlay_with_qr]overlay=${overlayX}:${overlayY}`;
 
-      const ffmpegCommand = `ffmpeg -f lavfi -i "${filterComplex}" -frames:v 1 -y "${outputPath}"`;
+      const ffmpegCommand = `ffmpeg -f lavfi -i color=c=black:s=${frameWidth}x${frameHeight} -i "${qrPath}" -filter_complex "${filterComplex}" -frames:v 1 -y "${outputPath}"`;
 
       console.log(`[OverlayProcessor] Generating static PNG overlay`);
       await execAsync(ffmpegCommand, { maxBuffer: 50 * 1024 * 1024 });

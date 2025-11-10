@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupAuth } from "./auth";
+import { OverlayProcessor } from "./overlay-processor";
+import { storage } from "./storage";
 
 const app = express();
 
@@ -42,6 +44,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const overlayProcessor = new OverlayProcessor(storage);
+  app.locals.overlayProcessor = overlayProcessor;
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -72,5 +77,7 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    overlayProcessor.start();
   });
 })();
