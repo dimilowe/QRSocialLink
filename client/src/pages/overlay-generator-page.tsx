@@ -80,6 +80,11 @@ export default function OverlayGeneratorPage() {
 
   const { data: overlays } = useQuery<OverlayRendition[]>({
     queryKey: ["/api/overlays"],
+    refetchInterval: (query) => {
+      // Auto-refresh every 500ms if any overlay is queued or rendering  
+      const hasProcessing = query.state.data?.some((o: OverlayRendition) => o.status === "queued" || o.status === "rendering");
+      return hasProcessing ? 500 : false;
+    },
   });
 
   const latestOverlay = overlays?.[0];
@@ -92,8 +97,8 @@ export default function OverlayGeneratorPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/overlays"] });
       toast({
-        title: "Overlay Queued",
-        description: "Your overlay has been queued for rendering. You'll be notified when it's ready.",
+        title: "Generating Overlay",
+        description: "Your overlay is being generated. This usually takes just a few seconds...",
       });
     },
     onError: (error: Error) => {
@@ -551,12 +556,6 @@ export default function OverlayGeneratorPage() {
     const canvasX = clickX / scaleFactor;
     const canvasY = clickY / scaleFactor;
     
-    console.log('[Selection Debug] Click detected:', {
-      clickX, clickY, canvasX, canvasY, scaleFactor,
-      isBannerTemplate,
-      hasQrBounds: !!qrBounds
-    });
-    
     // Priority 1: Check if clicking on QR code
     if (qrBounds) {
       const isInQr = 
@@ -565,13 +564,7 @@ export default function OverlayGeneratorPage() {
         canvasY >= qrBounds.y &&
         canvasY <= qrBounds.y + qrBounds.size;
       
-      console.log('[Selection Debug] QR check:', {
-        isInQr,
-        qrBounds
-      });
-      
       if (isInQr) {
-        console.log('[Selection Debug] QR code selected');
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(true);
@@ -588,10 +581,6 @@ export default function OverlayGeneratorPage() {
     // Priority 2: Check if clicking on banner overlay (banner templates only)
     if (isBannerTemplate) {
       const overlayBounds = getOverlayBounds();
-      console.log('[Selection Debug] Banner check:', {
-        overlayBounds,
-        hasOverlayBounds: !!overlayBounds
-      });
       
       if (overlayBounds) {
         const isInOverlay = 
@@ -600,14 +589,7 @@ export default function OverlayGeneratorPage() {
           clickY >= overlayBounds.y &&
           clickY <= overlayBounds.y + overlayBounds.height;
         
-        console.log('[Selection Debug] Banner overlay check:', {
-          isInOverlay,
-          bounds: overlayBounds,
-          click: { clickX, clickY }
-        });
-        
         if (isInOverlay) {
-          console.log('[Selection Debug] Banner selected');
           e.preventDefault();
           e.stopPropagation();
           setIsBannerSelected(true);
@@ -618,7 +600,6 @@ export default function OverlayGeneratorPage() {
     }
     
     // Priority 3: Clicked elsewhere, deselect everything
-    console.log('[Selection Debug] Deselecting all');
     setIsBannerSelected(false);
     setIsQrSelected(false);
   };

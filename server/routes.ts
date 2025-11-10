@@ -1341,8 +1341,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    let tempDir: string | null = null;
-
     try {
       const validatedData = insertOverlayRenditionSchema.parse(req.body);
 
@@ -1362,18 +1360,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rendition = await storage.createOverlayRendition(validatedData);
 
+      // Trigger immediate processing (no 5-second wait)
+      const { overlayProcessor } = req.app.locals;
+      if (overlayProcessor) {
+        setImmediate(() => overlayProcessor.processQueue());
+      }
+
       res.json(rendition);
     } catch (error: any) {
       console.error('Overlay generation error:', error);
       res.status(500).json({ message: error.message || "Failed to generate overlay" });
-    } finally {
-      if (tempDir) {
-        try {
-          await fs.rm(tempDir, { recursive: true, force: true });
-        } catch (cleanupError) {
-          console.error('Cleanup error:', cleanupError);
-        }
-      }
     }
   });
 
