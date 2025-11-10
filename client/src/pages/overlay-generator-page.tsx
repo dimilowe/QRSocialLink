@@ -527,7 +527,7 @@ export default function OverlayGeneratorPage() {
     const offsetX = Math.max(0, Math.round((platformConfig.width - effectiveWidth) / 2));
     
     let overlayY = 0;
-    if (selectedTemplate === "banner-top") {
+    if (selectedFramePosition === "banner-top") {
       overlayY = platformConfig.safeZone?.top ?? 0;
     } else {
       overlayY = platformConfig.height - effectiveHeight - (platformConfig.safeZone?.bottom ?? 0);
@@ -786,15 +786,19 @@ export default function OverlayGeneratorPage() {
     setResizeData(null);
   };
 
-  const isBannerTemplate = useMemo(() => {
-    if (!selectedFrame) return false;
+  const selectedFramePosition = useMemo(() => {
+    if (!selectedFrame) return null;
     try {
       const templateData = JSON.parse(selectedFrame.srcPath);
-      return templateData.position && templateData.position.startsWith("banner-");
+      return templateData.position || null;
     } catch {
-      return false;
+      return null;
     }
   }, [selectedFrame]);
+
+  const isBannerTemplate = useMemo(() => {
+    return selectedFramePosition !== null && selectedFramePosition.startsWith("banner-");
+  }, [selectedFramePosition]);
 
   const handleBannerResizePointerDown = (e: React.PointerEvent, handle: string) => {
     if (!isBannerTemplate || !previewImageRef.current) return;
