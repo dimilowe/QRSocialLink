@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_PRESETS } from "@shared/schema";
 import { Sparkles, Download, Eye, Video, Square } from "lucide-react";
 import type { Scan, Frame } from "@shared/schema";
 
 export default function OverlayGeneratorPage() {
+  const { toast } = useToast();
   const [selectedPlatform, setSelectedPlatform] = useState<string>("tiktok");
   const [selectedQR, setSelectedQR] = useState<string>("");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
@@ -26,6 +28,8 @@ export default function OverlayGeneratorPage() {
   const [qrXOffset, setQrXOffset] = useState<number>(0);
   const [qrYOffset, setQrYOffset] = useState<number>(0);
   const [overlayColor, setOverlayColor] = useState<string>("#9333EA");
+  const [overlayBackgroundImage, setOverlayBackgroundImage] = useState<string>("");
+  const [overlayImageFit, setOverlayImageFit] = useState<"cover" | "contain" | "stretch">("cover");
   
   const [qrBounds, setQrBounds] = useState<{x: number, y: number, size: number} | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -35,6 +39,7 @@ export default function OverlayGeneratorPage() {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const overlayImageInputRef = useRef<HTMLInputElement>(null);
 
   const { data: scans } = useQuery<Scan[]>({
     queryKey: ["/api/scans"],
@@ -242,8 +247,65 @@ export default function OverlayGeneratorPage() {
         if (effectiveBorderRadius > 0) {
           ctx.beginPath();
           ctx.roundRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height, effectiveBorderRadius);
-          ctx.fillStyle = overlayColor;
-          ctx.fill();
+          ctx.clip();
+        }
+        
+        if (overlayBackgroundImage) {
+          try {
+            const bgImage = new Image();
+            await new Promise((resolve, reject) => {
+              bgImage.onload = resolve;
+              bgImage.onerror = reject;
+              bgImage.src = overlayBackgroundImage;
+            });
+
+            ctx.fillStyle = overlayColor;
+            ctx.fillRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
+
+            let drawX = scaledOverlay.x;
+            let drawY = scaledOverlay.y;
+            let drawWidth = scaledOverlay.width;
+            let drawHeight = scaledOverlay.height;
+
+            if (overlayImageFit === "cover") {
+              const imgAspect = bgImage.width / bgImage.height;
+              const overlayAspect = scaledOverlay.width / scaledOverlay.height;
+
+              if (imgAspect > overlayAspect) {
+                drawWidth = scaledOverlay.height * imgAspect;
+                drawHeight = scaledOverlay.height;
+                drawX = scaledOverlay.x - (drawWidth - scaledOverlay.width) / 2;
+              } else {
+                drawWidth = scaledOverlay.width;
+                drawHeight = scaledOverlay.width / imgAspect;
+                drawY = scaledOverlay.y - (drawHeight - scaledOverlay.height) / 2;
+              }
+            } else if (overlayImageFit === "contain") {
+              const imgAspect = bgImage.width / bgImage.height;
+              const overlayAspect = scaledOverlay.width / scaledOverlay.height;
+
+              if (imgAspect > overlayAspect) {
+                drawWidth = scaledOverlay.width;
+                drawHeight = scaledOverlay.width / imgAspect;
+                drawY = scaledOverlay.y + (scaledOverlay.height - drawHeight) / 2;
+              } else {
+                drawWidth = scaledOverlay.height * imgAspect;
+                drawHeight = scaledOverlay.height;
+                drawX = scaledOverlay.x + (scaledOverlay.width - drawWidth) / 2;
+              }
+            }
+
+            ctx.drawImage(bgImage, drawX, drawY, drawWidth, drawHeight);
+          } catch (error) {
+            console.error("Failed to load overlay background image:", error);
+            toast({
+              title: "Image Load Failed",
+              description: "Failed to load the overlay background image. Using color fallback.",
+              variant: "destructive",
+            });
+            ctx.fillStyle = overlayColor;
+            ctx.fillRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
+          }
         } else {
           ctx.fillStyle = overlayColor;
           ctx.fillRect(scaledOverlay.x, scaledOverlay.y, scaledOverlay.width, scaledOverlay.height);
@@ -294,7 +356,25 @@ export default function OverlayGeneratorPage() {
 
     generatePreview();
   }, [selectedQR, selectedTemplate, selectedPlatform, ctaText, borderRadius, scans, templates, 
-      textFont, textSize, textColor, qrSizeModifier, qrXOffset, qrYOffset, overlayColor]);
+      textFont, textSize, textColor, qrSizeModifier, qrXOffset, qrYOffset, overlayColor,
+      overlayBackgroundImage, overlayImageFit]);
+
+  const handleOverlayImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === "string") {
+        setOverlayBackgroundImage(result);
+        if (overlayImageInputRef.current) {
+          overlayImageInputRef.current.value = "";
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-4">
@@ -459,24 +539,72 @@ export default function OverlayGeneratorPage() {
               <CardContent>
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="overlay-color">Overlay Background Color</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="overlay-color"
-                        type="color"
-                        value={overlayColor}
-                        onChange={(e) => setOverlayColor(e.target.value)}
-                        className="w-20 h-10 p-1 cursor-pointer"
-                        data-testid="input-overlay-color"
-                      />
-                      <Input
-                        type="text"
-                        value={overlayColor}
-                        onChange={(e) => setOverlayColor(e.target.value)}
-                        className="flex-1"
-                        placeholder="#9333EA"
-                        data-testid="input-overlay-color-text"
-                      />
+                    <Label>Overlay Background</Label>
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={overlayColor}
+                          onChange={(e) => setOverlayColor(e.target.value)}
+                          className="w-20 h-10 p-1 cursor-pointer"
+                          data-testid="input-overlay-color"
+                          disabled={!!overlayBackgroundImage}
+                        />
+                        <Input
+                          type="text"
+                          value={overlayColor}
+                          onChange={(e) => setOverlayColor(e.target.value)}
+                          className="flex-1"
+                          placeholder="#9333EA"
+                          data-testid="input-overlay-color-text"
+                          disabled={!!overlayBackgroundImage}
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <input
+                          ref={overlayImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleOverlayImageUpload}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => overlayImageInputRef.current?.click()}
+                          className="flex-1"
+                          data-testid="button-upload-overlay-image"
+                        >
+                          {overlayBackgroundImage ? "Change Image" : "Upload Image"}
+                        </Button>
+                        {overlayBackgroundImage && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOverlayBackgroundImage("")}
+                            data-testid="button-remove-overlay-image"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+
+                      {overlayBackgroundImage && (
+                        <div className="space-y-2">
+                          <Label htmlFor="overlay-fit">Image Fit</Label>
+                          <Select value={overlayImageFit} onValueChange={(value) => setOverlayImageFit(value as "cover" | "contain" | "stretch")}>
+                            <SelectTrigger id="overlay-fit" data-testid="select-overlay-fit">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cover">Cover (fill frame)</SelectItem>
+                              <SelectItem value="contain">Contain (fit inside)</SelectItem>
+                              <SelectItem value="stretch">Stretch (may distort)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -624,6 +752,8 @@ export default function OverlayGeneratorPage() {
                       setQrXOffset(0);
                       setQrYOffset(0);
                       setOverlayColor("#9333EA");
+                      setOverlayBackgroundImage("");
+                      setOverlayImageFit("cover");
                       setBorderRadius(0);
                     }}
                     data-testid="button-reset-styles"
