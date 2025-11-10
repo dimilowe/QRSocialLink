@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean, integer, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, integer, uuid, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -153,6 +153,21 @@ export const frames = pgTable("frames", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export type RenderConfig = {
+  textFont?: string;
+  textSize?: number;
+  textColor?: string;
+  qrSizeModifier?: number;
+  qrXOffset?: number;
+  qrYOffset?: number;
+  overlayColor?: string;
+  overlayBackgroundImage?: string;
+  overlayImageFit?: "cover" | "contain" | "stretch";
+  overlayWidth?: number;
+  overlayHeight?: number;
+  borderRadius?: number;
+};
+
 export const overlayRenditions = pgTable("overlay_renditions", {
   id: uuid("id").primaryKey().defaultRandom(),
   scanId: uuid("scan_id").notNull().references(() => scans.id, { onDelete: "cascade" }),
@@ -161,6 +176,7 @@ export const overlayRenditions = pgTable("overlay_renditions", {
   outputPath: text("output_path"),
   aspect: text("aspect").notNull(),
   ctaText: text("cta_text"),
+  renderConfig: jsonb("render_config").$type<RenderConfig | null>(),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -237,7 +253,22 @@ export const insertFrameSchema = createInsertSchema(frames).omit({
   createdAt: true,
 });
 
-export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions)
+export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions, {
+  renderConfig: z.object({
+    textFont: z.string().optional(),
+    textSize: z.number().optional(),
+    textColor: z.string().optional(),
+    qrSizeModifier: z.number().optional(),
+    qrXOffset: z.number().optional(),
+    qrYOffset: z.number().optional(),
+    overlayColor: z.string().optional(),
+    overlayBackgroundImage: z.string().optional(),
+    overlayImageFit: z.enum(["cover", "contain", "stretch"]).optional(),
+    overlayWidth: z.number().optional(),
+    overlayHeight: z.number().optional(),
+    borderRadius: z.number().optional(),
+  }).optional().nullable(),
+})
   .omit({
     id: true,
     createdAt: true,
