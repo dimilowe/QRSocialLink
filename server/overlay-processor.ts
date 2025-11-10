@@ -104,8 +104,8 @@ export class OverlayProcessor {
         textFont = "Arial",
         textSize = 48,
         borderRadius = 24,
-        ctaText = "",
       } = renderConfig;
+      const ctaText = overlay.ctaText || "";
 
       const safeArea = typeof frame.safeArea === 'string' 
         ? JSON.parse(frame.safeArea) 
