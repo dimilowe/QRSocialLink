@@ -89,7 +89,17 @@ This configuration has been battle-tested and resolves SSL certificate issues th
     - Size normalization prevents jumps when resizing (uses actual rendered size as baseline)
   - Authenticated overlay endpoints with Zod validation for data integrity.
   - Database schema: overlayRenditions table stores generated overlays with status tracking, frames table holds template metadata.
-  - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history).
+  - **Background Processing & Rendering**:
+    - Asynchronous overlay generation via OverlayProcessor service (polls every 5 seconds)
+    - Atomic job claiming prevents race conditions with multiple processor instances
+    - ImageMagick-based rendering pipeline for static PNG overlays with rounded corners support
+    - Composites: black background → rounded rectangle panel (borderRadius applied) → QR code → CTA text
+    - QR scale bounds (50-800px) prevent OOM errors during resize operations
+    - Supports both URL and base64 QR images (fetches remote URLs to temp files)
+    - Status workflow: queued → rendering → completed/failed with error tracking
+    - Temp file cleanup ensures no disk space leaks
+    - Generated overlays saved to server/output/overlays/{renditionId}.png
+  - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history), GET /api/overlays/:id/download (serves rendered PNG).
   - Security: All endpoints require authentication, proper authorization (user owns QR code), input validation with max length enforcement.
 
 ## External Dependencies
@@ -101,4 +111,5 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 - **Image Processing**: `sharp`
 - **File Uploads**: `multer`
 - **Utility Libraries**: `nanoid` (for slug generation), `UAParser` (for user agent parsing)
-- **FFmpeg**: System dependency (for future video overlay rendering)
+- **FFmpeg**: System dependency (for animated GIF QR code generation)
+- **ImageMagick**: System dependency (for static PNG overlay rendering with rounded corners)
