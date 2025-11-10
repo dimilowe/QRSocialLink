@@ -1297,6 +1297,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/overlays/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const overlayId = req.params.id;
+      const overlay = await storage.getOverlayRendition(overlayId);
+      
+      if (!overlay) {
+        return res.status(404).json({ message: "Overlay not found" });
+      }
+
+      const scan = await storage.getScan(overlay.scanId);
+      if (!scan || scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const { overlayProcessor } = req.app.locals;
+      if (overlayProcessor && overlay.outputPath) {
+        try {
+          const filePath = await overlayProcessor.getOutputPath(overlayId);
+          if (filePath) {
+            await fs.unlink(filePath);
+          }
+        } catch (fileError) {
+          console.error("Failed to delete overlay file:", fileError);
+        }
+      }
+
+      await storage.deleteOverlayRendition(overlayId);
+
+      res.json({ message: "Overlay deleted successfully" });
+    } catch (error: any) {
+      console.error("Delete overlay error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/overlays/generate", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });

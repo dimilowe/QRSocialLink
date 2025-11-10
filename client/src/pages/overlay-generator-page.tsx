@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PLATFORM_PRESETS } from "@shared/schema";
-import { Sparkles, Download, Eye, Video, Square } from "lucide-react";
+import { Sparkles, Download, Eye, Video, Square, Trash2, Edit } from "lucide-react";
 import type { Scan, Frame, InsertOverlayRendition, OverlayRendition } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -21,6 +22,8 @@ export default function OverlayGeneratorPage() {
   const [ctaText, setCtaText] = useState<string>("Scan to Shop");
   const [borderRadius, setBorderRadius] = useState<number>(0);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [overlayToDelete, setOverlayToDelete] = useState<string | null>(null);
   
   const [textFont, setTextFont] = useState<string>("Inter");
   const [textSize, setTextSize] = useState<number>(42);
@@ -102,10 +105,62 @@ export default function OverlayGeneratorPage() {
     },
   });
 
+  const deleteOverlayMutation = useMutation({
+    mutationFn: async (overlayId: string) => {
+      const response = await apiRequest("DELETE", `/api/overlays/${overlayId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/overlays"] });
+      setDeleteDialogOpen(false);
+      setOverlayToDelete(null);
+      toast({
+        title: "Overlay Deleted",
+        description: "Your overlay has been successfully deleted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete overlay. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const platformConfig = Object.values(PLATFORM_PRESETS).find(
     (p) => p.id === selectedPlatform
   );
 
+  const loadOverlayForEdit = (overlay: OverlayRendition) => {
+    setSelectedQR(overlay.scanId);
+    setSelectedTemplate(overlay.frameId);
+    setCtaText(overlay.ctaText || "Scan to Shop");
+    setSelectedPlatform(overlay.aspect || "tiktok");
+    
+    if (overlay.renderConfig && typeof overlay.renderConfig === 'object') {
+      const config = overlay.renderConfig as any;
+      if (config.textFont) setTextFont(config.textFont);
+      if (config.textSize !== undefined) setTextSize(config.textSize);
+      if (config.textColor) setTextColor(config.textColor);
+      if (config.qrSizeModifier !== undefined) setQrSizeModifier(config.qrSizeModifier);
+      if (config.qrXOffset !== undefined) setQrXOffset(config.qrXOffset);
+      if (config.qrYOffset !== undefined) setQrYOffset(config.qrYOffset);
+      if (config.overlayColor) setOverlayColor(config.overlayColor);
+      if (config.overlayBackgroundImage) setOverlayBackgroundImage(config.overlayBackgroundImage);
+      if (config.overlayImageFit) setOverlayImageFit(config.overlayImageFit);
+      if (config.overlayWidth !== undefined) setOverlayWidth(config.overlayWidth);
+      if (config.overlayHeight !== undefined) setOverlayHeight(config.overlayHeight);
+      if (config.borderRadius !== undefined) setBorderRadius(config.borderRadius);
+    }
+    
+    toast({
+      title: "Overlay Loaded",
+      description: "Overlay configuration loaded into editor. Click 'Generate Overlay' to create a new version.",
+    });
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const selectedScan = scans?.find((s) => s.id === selectedQR);
   const selectedFrame = templates?.find((t) => t.id === selectedTemplate);
@@ -1565,6 +1620,96 @@ export default function OverlayGeneratorPage() {
               </CardContent>
             </Card>
 
+            {overlays && overlays.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Overlays</CardTitle>
+                  <CardDescription>All your generated overlay frames</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {overlays.map((overlay) => {
+                      const overlayFrame = templates?.find((t) => t.id === overlay.frameId);
+                      const overlayScan = scans?.find((s) => s.id === overlay.scanId);
+                      const templateData = overlayFrame ? JSON.parse(overlayFrame.srcPath) : null;
+                      
+                      return (
+                        <Card key={overlay.id} className="overflow-hidden" data-testid={`card-overlay-${overlay.id}`}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-sm truncate">
+                                  {templateData?.name || "Overlay"}
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                  {overlay.aspect ? Object.values(PLATFORM_PRESETS).find(p => p.id === overlay.aspect)?.name : "Unknown"} • {new Date(overlay.createdAt).toLocaleDateString()}
+                                </CardDescription>
+                              </div>
+                              <Badge 
+                                variant={
+                                  overlay.status === "completed" ? "default" :
+                                  overlay.status === "failed" ? "destructive" :
+                                  "secondary"
+                                }
+                                data-testid={`status-overlay-${overlay.id}`}
+                              >
+                                {overlay.status}
+                              </Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pb-3">
+                            {overlay.ctaText && (
+                              <p className="text-xs text-muted-foreground mb-3 truncate">
+                                CTA: "{overlay.ctaText}"
+                              </p>
+                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="flex-1"
+                                disabled={overlay.status !== "completed"}
+                                onClick={() => {
+                                  window.open(`/api/overlays/${overlay.id}/download`, '_blank');
+                                }}
+                                data-testid={`button-download-${overlay.id}`}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => loadOverlayForEdit(overlay)}
+                                data-testid={`button-edit-${overlay.id}`}
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setOverlayToDelete(overlay.id);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`button-delete-${overlay.id}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Why Use Overlays?</CardTitle>
@@ -1593,6 +1738,30 @@ export default function OverlayGeneratorPage() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-overlay">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Overlay?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this overlay frame. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (overlayToDelete) {
+                  deleteOverlayMutation.mutate(overlayToDelete);
+                }
+              }}
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

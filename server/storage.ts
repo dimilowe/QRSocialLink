@@ -614,6 +614,12 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return result[0];
   }
+
+  async deleteOverlayRendition(id: string): Promise<void> {
+    await db
+      .delete(overlayRenditions)
+      .where(eq(overlayRenditions.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();
