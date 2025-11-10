@@ -19,6 +19,7 @@ export function TopHeader() {
     { icon: Sparkles, label: "Overlays", path: "/overlays" },
     { icon: BarChart3, label: "Campaigns", path: "/campaigns" },
     { icon: LayoutDashboard, label: "My QR Codes", path: "/dashboard" },
+    { icon: CreditCard, label: "Pricing", path: "/pricing" },
   ];
 
   return (

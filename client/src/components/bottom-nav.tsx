@@ -1,4 +1,4 @@
-import { Home, Plus, BarChart3, LayoutDashboard } from "lucide-react";
+import { Home, Plus, BarChart3, LayoutDashboard, CreditCard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -29,6 +29,11 @@ export function BottomNav() {
       icon: LayoutDashboard,
       label: "QR Codes",
       path: "/dashboard",
+    },
+    {
+      icon: CreditCard,
+      label: "Pricing",
+      path: "/pricing",
     },
   ];
 
