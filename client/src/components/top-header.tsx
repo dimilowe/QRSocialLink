@@ -80,7 +80,7 @@ export function TopHeader() {
               </Link>
             </Button>
           ) : (
-            <Button variant="default" size="sm" asChild data-testid="button-login">
+            <Button variant="default" size="sm" asChild data-testid="button-header-login">
               <Link href="/auth">
                 Log In
               </Link>
