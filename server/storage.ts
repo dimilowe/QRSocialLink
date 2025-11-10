@@ -108,6 +108,7 @@ export interface IStorage {
   createOverlayRendition(rendition: InsertOverlayRendition): Promise<OverlayRendition>;
   getOverlayRendition(id: string): Promise<OverlayRendition | undefined>;
   getUserOverlayRenditions(userId: string): Promise<OverlayRendition[]>;
+  claimQueuedOverlayRendition(): Promise<OverlayRendition | null>;
   updateOverlayRendition(id: string, updates: Partial<OverlayRendition>): Promise<OverlayRendition>;
 }
 
@@ -579,6 +580,30 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(overlayRenditions.createdAt));
 
     return overlays.map(({ rendition }) => rendition);
+  }
+
+  async claimQueuedOverlayRendition(): Promise<OverlayRendition | null> {
+    const queued = await db
+      .select()
+      .from(overlayRenditions)
+      .where(eq(overlayRenditions.status, "queued"))
+      .orderBy(overlayRenditions.createdAt)
+      .limit(1);
+
+    if (queued.length === 0) {
+      return null;
+    }
+
+    const result = await db
+      .update(overlayRenditions)
+      .set({ status: "rendering" })
+      .where(and(
+        eq(overlayRenditions.id, queued[0].id),
+        eq(overlayRenditions.status, "queued")
+      ))
+      .returning();
+
+    return result.length > 0 ? result[0] : null;
   }
 
   async updateOverlayRendition(id: string, updates: Partial<OverlayRendition>): Promise<OverlayRendition> {
