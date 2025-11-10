@@ -541,34 +541,86 @@ export default function OverlayGeneratorPage() {
     };
   };
 
-  const handleQrPointerDown = (e: React.PointerEvent) => {
-    if (!qrBounds || !previewImageRef.current) return;
+  const handlePreviewPointerDown = (e: React.PointerEvent) => {
+    if (!previewImageRef.current) return;
     
     const rect = previewImageRef.current.getBoundingClientRect();
     const scaleFactor = getScaleFactor();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const canvasX = clickX / scaleFactor;
+    const canvasY = clickY / scaleFactor;
     
-    const canvasX = (e.clientX - rect.left) / scaleFactor;
-    const canvasY = (e.clientY - rect.top) / scaleFactor;
+    console.log('[Selection Debug] Click detected:', {
+      clickX, clickY, canvasX, canvasY, scaleFactor,
+      isBannerTemplate,
+      hasQrBounds: !!qrBounds
+    });
     
-    const isInQr = 
-      canvasX >= qrBounds.x &&
-      canvasX <= qrBounds.x + qrBounds.size &&
-      canvasY >= qrBounds.y &&
-      canvasY <= qrBounds.y + qrBounds.size;
-    
-    if (isInQr) {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-      setIsQrSelected(true);
-      setIsBannerSelected(false);
-      setDragStart({
-        x: canvasX - qrBounds.x,
-        y: canvasY - qrBounds.y
+    // Priority 1: Check if clicking on QR code
+    if (qrBounds) {
+      const isInQr = 
+        canvasX >= qrBounds.x &&
+        canvasX <= qrBounds.x + qrBounds.size &&
+        canvasY >= qrBounds.y &&
+        canvasY <= qrBounds.y + qrBounds.size;
+      
+      console.log('[Selection Debug] QR check:', {
+        isInQr,
+        qrBounds
       });
-    } else {
-      setIsQrSelected(false);
+      
+      if (isInQr) {
+        console.log('[Selection Debug] QR code selected');
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+        setIsQrSelected(true);
+        setIsBannerSelected(false);
+        setDragStart({
+          x: canvasX - qrBounds.x,
+          y: canvasY - qrBounds.y
+        });
+        return;
+      }
     }
+    
+    // Priority 2: Check if clicking on banner overlay (banner templates only)
+    if (isBannerTemplate) {
+      const overlayBounds = getOverlayBounds();
+      console.log('[Selection Debug] Banner check:', {
+        overlayBounds,
+        hasOverlayBounds: !!overlayBounds
+      });
+      
+      if (overlayBounds) {
+        const isInOverlay = 
+          clickX >= overlayBounds.x &&
+          clickX <= overlayBounds.x + overlayBounds.width &&
+          clickY >= overlayBounds.y &&
+          clickY <= overlayBounds.y + overlayBounds.height;
+        
+        console.log('[Selection Debug] Banner overlay check:', {
+          isInOverlay,
+          bounds: overlayBounds,
+          click: { clickX, clickY }
+        });
+        
+        if (isInOverlay) {
+          console.log('[Selection Debug] Banner selected');
+          e.preventDefault();
+          e.stopPropagation();
+          setIsBannerSelected(true);
+          setIsQrSelected(false);
+          return;
+        }
+      }
+    }
+    
+    // Priority 3: Clicked elsewhere, deselect everything
+    console.log('[Selection Debug] Deselecting all');
+    setIsBannerSelected(false);
+    setIsQrSelected(false);
   };
 
   const handleQrPointerMove = (e: React.PointerEvent) => {
@@ -743,50 +795,6 @@ export default function OverlayGeneratorPage() {
       return false;
     }
   }, [selectedFrame]);
-
-  const handleBannerClick = (e: React.PointerEvent) => {
-    if (!isBannerTemplate || !previewImageRef.current) return;
-    
-    const rect = previewImageRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    
-    if (qrBounds && previewImageRef.current) {
-      const scaleFactor = getScaleFactor();
-      const canvasX = clickX / scaleFactor;
-      const canvasY = clickY / scaleFactor;
-      
-      const isInQr = 
-        canvasX >= qrBounds.x &&
-        canvasX <= qrBounds.x + qrBounds.size &&
-        canvasY >= qrBounds.y &&
-        canvasY <= qrBounds.y + qrBounds.size;
-      
-      if (isInQr) {
-        e.stopPropagation();
-        return;
-      }
-    }
-    
-    const overlayBounds = getOverlayBounds();
-    if (overlayBounds) {
-      const isInOverlay = 
-        clickX >= overlayBounds.x &&
-        clickX <= overlayBounds.x + overlayBounds.width &&
-        clickY >= overlayBounds.y &&
-        clickY <= overlayBounds.y + overlayBounds.height;
-      
-      if (isInOverlay) {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsBannerSelected(true);
-        setIsQrSelected(false);
-      } else {
-        setIsBannerSelected(false);
-        setIsQrSelected(false);
-      }
-    }
-  };
 
   const handleBannerResizePointerDown = (e: React.PointerEvent, handle: string) => {
     if (!isBannerTemplate || !previewImageRef.current) return;
@@ -1365,9 +1373,16 @@ export default function OverlayGeneratorPage() {
                 </CardTitle>
                 <CardDescription>
                   {isBannerTemplate 
-                    ? "Click QR code to select and drag to move, or click the purple overlay section to resize it"
-                    : "Click the QR code to select it, then drag to move or use corner handles to resize"}
+                    ? "Click the purple banner to select it and show resize handles. Click the QR code to drag it around."
+                    : "Click the QR code to select it and show corner handles, then drag to move or use handles to resize"}
                 </CardDescription>
+                {previewUrl && !isQrSelected && !isBannerSelected && (
+                  <div className="mt-2 p-2 bg-muted/50 rounded-md border border-border/30">
+                    <p className="text-xs text-muted-foreground">
+                      💡 Tip: Click on the {isBannerTemplate ? "purple banner or QR code" : "QR code"} in the preview to select it first
+                    </p>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <canvas ref={canvasRef} className="hidden" />
@@ -1376,7 +1391,7 @@ export default function OverlayGeneratorPage() {
                     <div 
                       className="flex justify-center relative"
                       ref={previewContainerRef}
-                      onPointerDown={handleQrPointerDown}
+                      onPointerDown={handlePreviewPointerDown}
                       onPointerMove={
                         isDragging ? handleQrPointerMove : 
                         isResizing ? handleResizePointerMove : 
@@ -1392,10 +1407,7 @@ export default function OverlayGeneratorPage() {
                       style={{ touchAction: "none" }}
                     >
                       <div className="relative">
-                        <div 
-                          className="relative"
-                          onPointerDown={handleBannerClick}
-                        >
+                        <div className="relative">
                           <img
                             ref={previewImageRef}
                             src={previewUrl}
