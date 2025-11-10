@@ -135,7 +135,7 @@ export class OverlayProcessor {
         await fs.writeFile(qrPath, qrBuffer);
       }
 
-      const qrScale = 200 * qrSizeModifier;
+      const qrScale = Math.min(Math.max(200 * qrSizeModifier, 50), 800);
       const qrX = (overlayWidth / 2) - (qrScale / 2) + qrXOffset;
       const qrY = (overlayHeight / 2) - (qrScale / 2) + qrYOffset;
       
@@ -144,30 +144,32 @@ export class OverlayProcessor {
         ? (frameHeight - safeArea.bottom - overlayHeight - 50)
         : (frameHeight - overlayHeight - 100);
 
-      const overlayHex = overlayColor.replace('#', '');
-      const textColorHex = textColor.replace('#', '');
+      const overlayPanelPath = path.join(tempDir, "panel.png");
+      const compositePath = path.join(tempDir, "composite.png");
       
-      let filterComplex = `color=c=black:s=${frameWidth}x${frameHeight}[bg];`;
-      filterComplex += `color=c=0x${overlayHex}:s=${overlayWidth}x${overlayHeight}[overlay];`;
-      filterComplex += `[1:v]scale=${qrScale}:${qrScale}[qr];`;
-      filterComplex += `[overlay][qr]overlay=${qrX}:${qrY}[overlay_with_qr];`;
+      const createPanelCmd = `convert -size ${overlayWidth}x${overlayHeight} xc:"${overlayColor}" -alpha set -channel RGBA -background none -fill "${overlayColor}" -draw "roundrectangle 0,0 ${overlayWidth},${overlayHeight} ${borderRadius},${borderRadius}" "${overlayPanelPath}"`;
+      await execAsync(createPanelCmd, { maxBuffer: 50 * 1024 * 1024 });
       
-      let finalComposite = "[bg][overlay_with_qr]overlay=" + overlayX + ":" + overlayY;
+      const resizeQrCmd = `convert "${qrPath}" -resize ${qrScale}x${qrScale}! "${qrPath}"`;
+      await execAsync(resizeQrCmd, { maxBuffer: 50 * 1024 * 1024 });
+      
+      const overlayQrCmd = `convert "${overlayPanelPath}" "${qrPath}" -geometry +${qrX}+${qrY} -composite "${overlayPanelPath}"`;
+      await execAsync(overlayQrCmd, { maxBuffer: 50 * 1024 * 1024 });
       
       if (ctaText && ctaText.trim()) {
-        const escapedText = ctaText.replace(/'/g, "'\\\\\\''").replace(/:/g, "\\\\:");
-        const absoluteTextY = overlayY + qrY + qrScale + 40;
-        
-        filterComplex += finalComposite + "[composed];";
-        filterComplex += `[composed]drawtext=text='${escapedText}':fontcolor=0x${textColorHex}:fontsize=${textSize}:x=(w-text_w)/2:y=${absoluteTextY}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
-      } else {
-        filterComplex += finalComposite;
+        const textX = overlayWidth / 2;
+        const textY = qrY + qrScale + 40;
+        const addTextCmd = `convert "${overlayPanelPath}" -font DejaVu-Sans-Bold -pointsize ${textSize} -fill "${textColor}" -gravity North -annotate +0+${textY} "${ctaText.replace(/"/g, '\\"')}" "${overlayPanelPath}"`;
+        await execAsync(addTextCmd, { maxBuffer: 50 * 1024 * 1024 });
       }
-
-      const ffmpegCommand = `ffmpeg -f lavfi -i color=c=black:s=${frameWidth}x${frameHeight} -i "${qrPath}" -filter_complex "${filterComplex}" -frames:v 1 -y "${outputPath}"`;
-
-      console.log(`[OverlayProcessor] Generating static PNG overlay with${ctaText ? '' : 'out'} CTA text`);
-      await execAsync(ffmpegCommand, { maxBuffer: 50 * 1024 * 1024 });
+      
+      const createBgCmd = `convert -size ${frameWidth}x${frameHeight} xc:black "${compositePath}"`;
+      await execAsync(createBgCmd, { maxBuffer: 50 * 1024 * 1024 });
+      
+      const finalCompositeCmd = `convert "${compositePath}" "${overlayPanelPath}" -geometry +${overlayX}+${overlayY} -composite "${outputPath}"`;
+      
+      console.log(`[OverlayProcessor] Generating static PNG overlay with${ctaText ? '' : 'out'} CTA text and ${borderRadius}px border radius`);
+      await execAsync(finalCompositeCmd, { maxBuffer: 50 * 1024 * 1024 });
 
       await this.storage.updateOverlayRendition(overlay.id, {
         status: "completed",
