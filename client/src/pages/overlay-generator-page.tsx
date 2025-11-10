@@ -1106,7 +1106,7 @@ export default function OverlayGeneratorPage() {
                   Preview
                 </CardTitle>
                 <CardDescription>
-                  See how your overlay will look
+                  Click the QR code to select it, then drag to move or use corner handles to resize
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1135,8 +1135,10 @@ export default function OverlayGeneratorPage() {
                         />
                         {qrBounds && previewImageRef.current && (
                           <div
-                            className={`absolute pointer-events-auto cursor-move transition-all ${
-                              isQrSelected ? "ring-2 ring-primary ring-offset-2" : "hover:ring-2 hover:ring-primary/50"
+                            className={`absolute pointer-events-auto cursor-move transition-all border-2 border-dashed ${
+                              isQrSelected 
+                                ? "ring-2 ring-primary ring-offset-2 border-primary" 
+                                : "border-primary/30 hover:border-primary hover:ring-2 hover:ring-primary/50"
                             }`}
                             style={{
                               left: `${(qrBounds.x / (platformConfig?.width || 1)) * previewImageRef.current.offsetWidth}px`,
