@@ -14,26 +14,34 @@ export type PlanTier = typeof PLAN_TIERS[keyof typeof PLAN_TIERS];
 
 export const PLAN_LIMITS = {
   free: {
-    maxQRs: 1,
+    maxQRs: 0,
     canEdit: false,
+    canDownload: false,
+    canSave: false,
     hasAnalytics: false,
     hasBranding: false,
   },
   starter: {
     maxQRs: 20,
     canEdit: true,
+    canDownload: true,
+    canSave: true,
     hasAnalytics: true,
     hasBranding: false,
   },
   pro: {
     maxQRs: 50,
     canEdit: true,
+    canDownload: true,
+    canSave: true,
     hasAnalytics: true,
     hasBranding: false,
   },
   enterprise: {
-    maxQRs: -1, // unlimited
+    maxQRs: -1,
     canEdit: true,
+    canDownload: true,
+    canSave: true,
     hasAnalytics: true,
     hasBranding: true,
   },
