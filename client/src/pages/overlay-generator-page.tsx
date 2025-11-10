@@ -49,6 +49,16 @@ export default function OverlayGeneratorPage() {
     scaledQR: any;
   } | null>(null);
   
+  const [isBannerSelected, setIsBannerSelected] = useState<boolean>(false);
+  const [isBannerResizing, setIsBannerResizing] = useState<boolean>(false);
+  const [bannerResizeHandle, setBannerResizeHandle] = useState<string | null>(null);
+  const [bannerResizeData, setBannerResizeData] = useState<{
+    initialWidth: number;
+    initialHeight: number;
+    initialMouseX: number;
+    initialMouseY: number;
+  } | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const overlayImageInputRef = useRef<HTMLInputElement>(null);
