@@ -57,6 +57,8 @@ export default function OverlayGeneratorPage() {
     initialHeight: number;
     initialMouseX: number;
     initialMouseY: number;
+    initialDisplayWidth: number;
+    initialDisplayHeight: number;
   } | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -662,7 +664,7 @@ export default function OverlayGeneratorPage() {
   };
 
   const handleBannerResizePointerDown = (e: React.PointerEvent, handle: string) => {
-    if (!isBannerTemplate) return;
+    if (!isBannerTemplate || !previewImageRef.current) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -676,12 +678,14 @@ export default function OverlayGeneratorPage() {
       initialWidth: overlayWidth,
       initialHeight: overlayHeight,
       initialMouseX: e.clientX,
-      initialMouseY: e.clientY
+      initialMouseY: e.clientY,
+      initialDisplayWidth: previewImageRef.current.offsetWidth,
+      initialDisplayHeight: previewImageRef.current.offsetHeight
     });
   };
 
   const handleBannerResizePointerMove = (e: React.PointerEvent) => {
-    if (!isBannerResizing || !bannerResizeData || !bannerResizeHandle || !previewImageRef.current) return;
+    if (!isBannerResizing || !bannerResizeData || !bannerResizeHandle) return;
     
     e.preventDefault();
     
@@ -689,10 +693,11 @@ export default function OverlayGeneratorPage() {
       const deltaX = e.clientX - bannerResizeData.initialMouseX;
       const deltaY = e.clientY - bannerResizeData.initialMouseY;
       
-      const scaleFactor = previewImageRef.current!.offsetWidth / bannerResizeData.initialWidth;
+      const scaleX = bannerResizeData.initialDisplayWidth / bannerResizeData.initialWidth;
+      const scaleY = bannerResizeData.initialDisplayHeight / bannerResizeData.initialHeight;
       
-      const actualDeltaX = deltaX / scaleFactor;
-      const actualDeltaY = deltaY / scaleFactor;
+      const actualDeltaX = deltaX / scaleX;
+      const actualDeltaY = deltaY / scaleY;
       
       let newWidth = bannerResizeData.initialWidth;
       let newHeight = bannerResizeData.initialHeight;
