@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { PLATFORM_PRESETS } from "@shared/schema";
 import { Sparkles, Download, Eye, Video, Square } from "lucide-react";
-import type { Scan, Frame } from "@shared/schema";
+import type { Scan, Frame, InsertOverlayRendition, OverlayRendition } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function OverlayGeneratorPage() {
   const { toast } = useToast();
@@ -72,6 +73,27 @@ export default function OverlayGeneratorPage() {
 
   const { data: templates } = useQuery<Frame[]>({
     queryKey: ["/api/overlay-templates"],
+  });
+
+  const generateOverlayMutation = useMutation({
+    mutationFn: async (data: InsertOverlayRendition) => {
+      const response = await apiRequest("POST", "/api/overlays/generate", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/overlays"] });
+      toast({
+        title: "Overlay Queued",
+        description: "Your overlay has been queued for rendering. You'll be notified when it's ready.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to queue overlay for rendering. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const platformConfig = Object.values(PLATFORM_PRESETS).find(
@@ -1483,11 +1505,35 @@ export default function OverlayGeneratorPage() {
                   <Button
                     className="w-full"
                     size="lg"
-                    disabled={!selectedQR || !selectedTemplate}
+                    disabled={!selectedQR || !selectedTemplate || generateOverlayMutation.isPending}
+                    onClick={() => {
+                      if (!selectedQR || !selectedTemplate || !platformConfig) return;
+                      
+                      generateOverlayMutation.mutate({
+                        scanId: selectedQR,
+                        frameId: selectedTemplate,
+                        aspect: platformConfig.aspectRatio,
+                        ctaText: ctaText || null,
+                        renderConfig: {
+                          textFont,
+                          textSize,
+                          textColor,
+                          qrSizeModifier,
+                          qrXOffset,
+                          qrYOffset,
+                          overlayColor,
+                          overlayBackgroundImage,
+                          overlayImageFit,
+                          overlayWidth,
+                          overlayHeight,
+                          borderRadius,
+                        },
+                      });
+                    }}
                     data-testid="button-generate"
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
-                    Generate Overlay
+                    {generateOverlayMutation.isPending ? "Generating..." : "Generate Overlay"}
                   </Button>
 
                   <Button
