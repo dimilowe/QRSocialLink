@@ -78,6 +78,15 @@ This configuration has been battle-tested and resolves SSL certificate issues th
   - Create social media-optimized overlay frames that nest QR codes within platform templates (TikTok, YouTube Shorts, Instagram Reels).
   - Platform presets with accurate safe zones: TikTok (131px top, 367px bottom), Instagram Reels, YouTube Shorts (all 1080x1920, 9:16 aspect ratio).
   - Customizable CTA text (max 120 characters) for maximum engagement.
+  - **Interactive Canva-Style Editor**:
+    - Click-and-drag QR code repositioning with real-time preview on canvas overlay
+    - Four corner resize handles with anchor-based logic (opposite corner stays fixed during resize)
+    - Visual selection highlighting when QR code is active
+    - Bidirectional synchronization between interactive drag/resize and slider controls
+    - Performance-optimized with data caching (template JSON parsed once per gesture)
+    - Coordinate translation between display scale and canvas dimensions for pixel-perfect positioning
+    - Diagonal-based resize calculation ensures smooth handle tracking across all corners
+    - Size normalization prevents jumps when resizing (uses actual rendered size as baseline)
   - Authenticated overlay endpoints with Zod validation for data integrity.
   - Database schema: overlayRenditions table stores generated overlays with status tracking, frames table holds template metadata.
   - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history).
