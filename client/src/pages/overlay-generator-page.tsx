@@ -436,9 +436,6 @@ export default function OverlayGeneratorPage() {
   const handleQrPointerDown = (e: React.PointerEvent) => {
     if (!qrBounds || !previewImageRef.current) return;
     
-    e.preventDefault();
-    e.stopPropagation();
-    
     const rect = previewImageRef.current.getBoundingClientRect();
     const scaleFactor = getScaleFactor();
     
@@ -452,8 +449,11 @@ export default function OverlayGeneratorPage() {
       canvasY <= qrBounds.y + qrBounds.size;
     
     if (isInQr) {
+      e.preventDefault();
+      e.stopPropagation();
       setIsDragging(true);
       setIsQrSelected(true);
+      setIsBannerSelected(false);
       setDragStart({
         x: canvasX - qrBounds.x,
         y: canvasY - qrBounds.y
@@ -655,10 +655,13 @@ export default function OverlayGeneratorPage() {
         canvasY <= qrBounds.y + qrBounds.size;
       
       if (isInQr) {
+        e.stopPropagation();
         return;
       }
     }
     
+    e.preventDefault();
+    e.stopPropagation();
     setIsBannerSelected(true);
     setIsQrSelected(false);
   };
