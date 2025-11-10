@@ -18,33 +18,18 @@ interface ProUpgradeModalProps {
 
 const plans = [
   {
-    id: "free",
-    name: "Free",
-    price: 0,
-    icon: Check,
-    description: "Perfect for trying out QR Social",
-    features: [
-      "1 static QR code",
-      "Public feed access",
-      "Like & comment",
-      "Follow users",
-    ],
-    cta: "Current Plan",
-    disabled: true,
-  },
-  {
     id: "starter",
     name: "Starter",
     price: 10,
     icon: Sparkles,
-    description: "Great for personal use",
+    description: "Perfect for personal projects",
     popular: false,
     features: [
       "20 editable QR codes",
+      "Save & download QR codes",
       "Edit QR destinations anytime",
       "Basic analytics",
-      "Scan tracking",
-      "Everything in Free",
+      "Custom colors & designs",
     ],
     cta: "Get Starter",
   },
@@ -53,14 +38,15 @@ const plans = [
     name: "Pro",
     price: 30,
     icon: Crown,
-    description: "Best for professionals",
+    description: "Best for professionals & marketers",
     popular: true,
     features: [
       "50 editable QR codes",
-      "Advanced analytics",
-      "Custom QR colors",
+      "Save & download QR codes",
+      "Advanced analytics dashboard",
+      "A/B testing & campaigns",
+      "Platform overlay generator",
       "Priority support",
-      "Everything in Starter",
     ],
     cta: "Get Pro",
   },
@@ -73,8 +59,9 @@ const plans = [
     popular: false,
     features: [
       "Unlimited QR codes",
-      "Custom branding",
+      "Save & download QR codes",
       "Full analytics dashboard",
+      "Custom branding removal",
       "Team collaboration",
       "Dedicated support",
     ],
@@ -86,9 +73,8 @@ export function ProUpgradeModal({ open, onOpenChange }: ProUpgradeModalProps) {
   const [, setLocation] = useLocation();
 
   const handleUpgrade = (planId: string) => {
-    if (planId === "free") return;
     onOpenChange(false);
-    setLocation(`/subscribe?plan=${planId}`);
+    setLocation("/pricing");
   };
 
   return (
@@ -99,11 +85,11 @@ export function ProUpgradeModal({ open, onOpenChange }: ProUpgradeModalProps) {
             Choose Your Plan
           </DialogTitle>
           <DialogDescription>
-            Unlock more QR codes and powerful features
+            Build and preview for free. Subscribe to save, download, and unlock powerful analytics.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 my-4">
+        <div className="grid sm:grid-cols-3 gap-4 my-4">
           {plans.map((plan) => {
             const Icon = plan.icon;
             return (
@@ -148,7 +134,6 @@ export function ProUpgradeModal({ open, onOpenChange }: ProUpgradeModalProps) {
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
                   onClick={() => handleUpgrade(plan.id)}
-                  disabled={plan.disabled}
                   data-testid={`button-upgrade-to-${plan.id}`}
                 >
                   {plan.cta}

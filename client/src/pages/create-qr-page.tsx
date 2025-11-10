@@ -481,6 +481,17 @@ export default function CreateQRPage() {
         canvasFillEnabled,
         canvasFillColor,
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.requiresUpgrade) {
+          const upgradeError: any = new Error(errorData.message);
+          upgradeError.requiresUpgrade = true;
+          throw upgradeError;
+        }
+        throw new Error(errorData.message || "Failed to create QR code");
+      }
+      
       return response.json();
     },
     onSuccess: () => {
@@ -491,12 +502,25 @@ export default function CreateQRPage() {
       });
       setLocation("/dashboard");
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create QR code",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      if (error.requiresUpgrade) {
+        toast({
+          title: "Upgrade Required",
+          description: error.message,
+          variant: "destructive",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => setLocation("/pricing")}>
+              View Plans
+            </Button>
+          ) as any,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create QR code",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -524,6 +548,20 @@ export default function CreateQRPage() {
 
   const handleDownloadQR = async () => {
     if (!qrImageUrl) return;
+    
+    if (user && user.plan === 'free') {
+      toast({
+        title: "Upgrade Required",
+        description: "Upgrade to a paid plan to download QR codes. You can build and preview for free!",
+        variant: "destructive",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => setLocation("/pricing")}>
+            View Plans
+          </Button>
+        ) as any,
+      });
+      return;
+    }
     
     if (backgroundImage && backgroundImageType?.includes('gif')) {
       try {

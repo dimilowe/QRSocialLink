@@ -1,7 +1,7 @@
 # QR Social
 
 ## Overview
-QR Social is a full-stack web application designed as a marketing analytics platform for QR codes. It enables users to create custom-branded QR codes, implement A/B testing for various destinations, and meticulously track comprehensive analytics. The platform supports detailed tracking of device types, social media traffic sources (like TikTok, Instagram, YouTube), operating system and browser data, and virality trends. It operates on a freemium model with a 4-tier subscription system. The business vision is to provide a robust tool for marketers to optimize QR code campaigns, understand user engagement, and drive conversions effectively.
+QR Social is a full-stack web application designed as a marketing analytics platform for QR codes. It enables users to create custom-branded QR codes, implement A/B testing for various destinations, and meticulously track comprehensive analytics. The platform supports detailed tracking of device types, social media traffic sources (like TikTok, Instagram, YouTube), operating system and browser data, and virality trends. It operates on a preview-only free model with a 3-tier paid subscription system (Starter, Pro, Unlimited). Users can build and preview QR codes for free but need a paid subscription to save or download. The business vision is to provide a robust tool for marketers to optimize QR code campaigns, understand user engagement, and drive conversions effectively.
 
 ## User Preferences
 
@@ -62,7 +62,7 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 **Feature Specifications:**
 - **Authentication**: Email/password via Passport.js, session-based with protected routes.
 - **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG/GIF (animated), storage, and history. Editable destinations for paid plans.
-- **Subscription Model**: 4 tiers (Free, Starter, Pro, Unlimited) with feature-based limits enforced by the backend, integrated with Stripe checkout and dynamic updates.
+- **Subscription Model**: Preview-only free access + 3 paid tiers (Starter $10/mo, Pro $30/mo, Unlimited $99/mo). Free users can build and preview QR codes but cannot save or download. Feature-based limits (canSave, canDownload) enforced by the backend, integrated with Stripe checkout and dynamic updates via webhooks.
 - **Campaigns & A/B Testing**: CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
 - **Advanced Analytics**: 
   - **Campaign Analytics**: Comprehensive tracking for campaigns including device types, social media sources, OS/browser breakdown, and time-series data.

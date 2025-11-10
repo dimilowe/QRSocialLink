@@ -1,4 +1,4 @@
-import { QrCode, Home, Plus, LayoutDashboard, BarChart3, Sparkles } from "lucide-react";
+import { QrCode, Home, Plus, LayoutDashboard, BarChart3, Sparkles, CreditCard } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,6 +59,14 @@ export function TopHeader() {
         )}
 
         <div className="flex items-center gap-2">
+          {!user && (
+            <Button variant="outline" size="sm" asChild data-testid="button-pricing">
+              <Link href="/pricing">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden sm:inline">Pricing</span>
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
           
           {user ? (

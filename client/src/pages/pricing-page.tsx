@@ -129,12 +129,8 @@ export default function PricingPage() {
 
   const createSubscription = useMutation({
     mutationFn: async (planTier: string) => {
-      const response = await apiRequest(`/api/get-or-create-subscription`, {
-        method: "POST",
-        body: JSON.stringify({ planTier }),
-        headers: { "Content-Type": "application/json" },
-      });
-      return response;
+      const response = await apiRequest("POST", "/api/get-or-create-subscription", { planTier });
+      return response.json();
     },
     onSuccess: (data) => {
       if (data.success) {

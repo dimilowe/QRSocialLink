@@ -10,6 +10,7 @@ import AuthPage from "@/pages/auth-page";
 import HomePage from "@/pages/home-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
+import PricingPage from "@/pages/pricing-page";
 import CreateQRPage from "@/pages/create-qr-page";
 import DashboardPage from "@/pages/dashboard-page";
 import CampaignsPage from "@/pages/campaigns-page";
@@ -56,6 +57,7 @@ function Router() {
           }}
         </Route>
         <Route path="/" component={HomePage} />
+        <Route path="/pricing" component={PricingPage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
@@ -63,7 +65,7 @@ function Router() {
         <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
-        <Route>{() => <NotFound />}</Route>
+        <Route component={NotFound} />
       </Switch>
       {user && <BottomNav />}
     </>

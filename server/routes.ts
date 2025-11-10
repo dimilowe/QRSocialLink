@@ -88,6 +88,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const userPlan = req.user.plan as PlanTier;
+      const canSave = PLAN_LIMITS[userPlan]?.canSave;
+      
+      if (!canSave) {
+        return res.status(403).json({ 
+          message: "Upgrade to a paid plan to save QR codes. You can build and preview for free, but saving requires a subscription.",
+          requiresUpgrade: true
+        });
+      }
+
       const validatedData = insertScanSchema.parse({
         ...req.body,
         userId: req.user.id,
