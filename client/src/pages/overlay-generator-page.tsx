@@ -38,10 +38,21 @@ export default function OverlayGeneratorPage() {
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [isQrSelected, setIsQrSelected] = useState<boolean>(false);
+  const [resizeData, setResizeData] = useState<{
+    anchorX: number;
+    anchorY: number;
+    initialSize: number;
+    initialXOffset: number;
+    initialYOffset: number;
+    initialSizeModifier: number;
+    scaledQR: any;
+  } | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const overlayImageInputRef = useRef<HTMLInputElement>(null);
+  const previewImageRef = useRef<HTMLImageElement>(null);
 
   const { data: scans } = useQuery<Scan[]>({
     queryKey: ["/api/scans"],
@@ -401,6 +412,206 @@ export default function OverlayGeneratorPage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const getScaleFactor = () => {
+    if (!previewImageRef.current || !platformConfig) return 1;
+    const displayWidth = previewImageRef.current.offsetWidth;
+    const canvasWidth = platformConfig.width;
+    return displayWidth / canvasWidth;
+  };
+
+  const handleQrPointerDown = (e: React.PointerEvent) => {
+    if (!qrBounds || !previewImageRef.current) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = previewImageRef.current.getBoundingClientRect();
+    const scaleFactor = getScaleFactor();
+    
+    const canvasX = (e.clientX - rect.left) / scaleFactor;
+    const canvasY = (e.clientY - rect.top) / scaleFactor;
+    
+    const isInQr = 
+      canvasX >= qrBounds.x &&
+      canvasX <= qrBounds.x + qrBounds.size &&
+      canvasY >= qrBounds.y &&
+      canvasY <= qrBounds.y + qrBounds.size;
+    
+    if (isInQr) {
+      setIsDragging(true);
+      setIsQrSelected(true);
+      setDragStart({
+        x: canvasX - qrBounds.x,
+        y: canvasY - qrBounds.y
+      });
+    } else {
+      setIsQrSelected(false);
+    }
+  };
+
+  const handleQrPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || !dragStart || !qrBounds || !previewImageRef.current || !platformConfig) return;
+    
+    e.preventDefault();
+    
+    requestAnimationFrame(() => {
+      const rect = previewImageRef.current!.getBoundingClientRect();
+      const scaleFactor = getScaleFactor();
+      
+      const canvasX = (e.clientX - rect.left) / scaleFactor;
+      const canvasY = (e.clientY - rect.top) / scaleFactor;
+      
+      const templateData = selectedFrame ? JSON.parse(selectedFrame.srcPath) : null;
+      const safeArea = selectedFrame ? JSON.parse(selectedFrame.safeArea) : null;
+      
+      if (!templateData || !safeArea) return;
+      
+      const bannerDimensions = templateData.position.startsWith("banner-") ? {
+        width: overlayWidth,
+        height: overlayHeight
+      } : null;
+      
+      const { scaledQR } = scaleOverlayForPlatform(templateData, safeArea, platformConfig, bannerDimensions);
+      
+      const newX = canvasX - dragStart.x;
+      const newY = canvasY - dragStart.y;
+      
+      const deltaX = newX - scaledQR.x;
+      const deltaY = newY - scaledQR.y;
+      
+      setQrXOffset(deltaX);
+      setQrYOffset(deltaY);
+    });
+  };
+
+  const handleQrPointerUp = () => {
+    setIsDragging(false);
+    setDragStart(null);
+  };
+
+  const handleResizePointerDown = (e: React.PointerEvent, handle: string) => {
+    if (!qrBounds || !selectedFrame || !platformConfig) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const templateData = JSON.parse(selectedFrame.srcPath);
+    const safeArea = JSON.parse(selectedFrame.safeArea);
+    
+    const bannerDimensions = templateData.position.startsWith("banner-") ? {
+      width: overlayWidth,
+      height: overlayHeight
+    } : null;
+    
+    const { scaledQR } = scaleOverlayForPlatform(templateData, safeArea, platformConfig, bannerDimensions);
+    
+    let anchorX: number, anchorY: number;
+    
+    switch (handle) {
+      case "nw":
+        anchorX = qrBounds.x + qrBounds.size;
+        anchorY = qrBounds.y + qrBounds.size;
+        break;
+      case "ne":
+        anchorX = qrBounds.x;
+        anchorY = qrBounds.y + qrBounds.size;
+        break;
+      case "sw":
+        anchorX = qrBounds.x + qrBounds.size;
+        anchorY = qrBounds.y;
+        break;
+      case "se":
+      default:
+        anchorX = qrBounds.x;
+        anchorY = qrBounds.y;
+        break;
+    }
+    
+    setIsResizing(true);
+    setResizeHandle(handle);
+    setIsQrSelected(true);
+    setResizeData({
+      anchorX,
+      anchorY,
+      initialSize: qrBounds.size,
+      initialXOffset: qrXOffset,
+      initialYOffset: qrYOffset,
+      initialSizeModifier: qrSizeModifier,
+      scaledQR
+    });
+    
+    const rect = previewImageRef.current!.getBoundingClientRect();
+    const scaleFactor = getScaleFactor();
+    
+    setDragStart({
+      x: (e.clientX - rect.left) / scaleFactor,
+      y: (e.clientY - rect.top) / scaleFactor
+    });
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent) => {
+    if (!isResizing || !resizeData || !previewImageRef.current || !resizeHandle) return;
+    
+    e.preventDefault();
+    
+    requestAnimationFrame(() => {
+      const rect = previewImageRef.current!.getBoundingClientRect();
+      const scaleFactor = getScaleFactor();
+      
+      const canvasX = (e.clientX - rect.left) / scaleFactor;
+      const canvasY = (e.clientY - rect.top) / scaleFactor;
+      
+      const { anchorX, anchorY, initialSize, initialSizeModifier, scaledQR } = resizeData;
+      
+      const newWidth = Math.abs(canvasX - anchorX);
+      const newHeight = Math.abs(canvasY - anchorY);
+      const newDiagonal = Math.sqrt(newWidth * newWidth + newHeight * newHeight);
+      
+      const initialDiagonal = initialSize * Math.SQRT2;
+      
+      const sizeRatio = newDiagonal / initialDiagonal;
+      const newSizeModifier = Math.max(50, Math.min(150, initialSizeModifier * sizeRatio));
+      
+      const actualNewSize = scaledQR.size * (newSizeModifier / 100);
+      
+      let newQrX: number, newQrY: number;
+      
+      switch (resizeHandle) {
+        case "nw":
+          newQrX = anchorX - actualNewSize;
+          newQrY = anchorY - actualNewSize;
+          break;
+        case "ne":
+          newQrX = anchorX;
+          newQrY = anchorY - actualNewSize;
+          break;
+        case "sw":
+          newQrX = anchorX - actualNewSize;
+          newQrY = anchorY;
+          break;
+        case "se":
+        default:
+          newQrX = anchorX;
+          newQrY = anchorY;
+          break;
+      }
+      
+      const newXOffset = newQrX - scaledQR.x;
+      const newYOffset = newQrY - scaledQR.y;
+      
+      setQrSizeModifier(newSizeModifier);
+      setQrXOffset(newXOffset);
+      setQrYOffset(newYOffset);
+    });
+  };
+
+  const handleResizePointerUp = () => {
+    setIsResizing(false);
+    setResizeHandle(null);
+    setDragStart(null);
+    setResizeData(null);
   };
 
   return (
@@ -902,16 +1113,66 @@ export default function OverlayGeneratorPage() {
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="bg-muted/50 rounded-lg overflow-hidden p-4">
                   {previewUrl ? (
-                    <div className="flex justify-center">
-                      <img
-                        src={previewUrl}
-                        alt="Overlay preview"
-                        className="max-h-[600px] w-auto border-2 border-border/50 rounded-lg shadow-lg"
-                        style={{
-                          aspectRatio: platformConfig?.aspectRatio || "9/16",
-                        }}
-                        data-testid="img-preview"
-                      />
+                    <div 
+                      className="flex justify-center relative"
+                      ref={previewContainerRef}
+                      onPointerDown={handleQrPointerDown}
+                      onPointerMove={isDragging ? handleQrPointerMove : isResizing ? handleResizePointerMove : undefined}
+                      onPointerUp={isDragging ? handleQrPointerUp : isResizing ? handleResizePointerUp : undefined}
+                      style={{ touchAction: "none" }}
+                    >
+                      <div className="relative">
+                        <img
+                          ref={previewImageRef}
+                          src={previewUrl}
+                          alt="Overlay preview"
+                          className="max-h-[600px] w-auto border-2 border-border/50 rounded-lg shadow-lg select-none"
+                          style={{
+                            aspectRatio: platformConfig?.aspectRatio || "9/16",
+                            pointerEvents: "none"
+                          }}
+                          data-testid="img-preview"
+                        />
+                        {qrBounds && previewImageRef.current && (
+                          <div
+                            className={`absolute pointer-events-auto cursor-move transition-all ${
+                              isQrSelected ? "ring-2 ring-primary ring-offset-2" : "hover:ring-2 hover:ring-primary/50"
+                            }`}
+                            style={{
+                              left: `${(qrBounds.x / (platformConfig?.width || 1)) * previewImageRef.current.offsetWidth}px`,
+                              top: `${(qrBounds.y / (platformConfig?.height || 1)) * previewImageRef.current.offsetHeight}px`,
+                              width: `${(qrBounds.size / (platformConfig?.width || 1)) * previewImageRef.current.offsetWidth}px`,
+                              height: `${(qrBounds.size / (platformConfig?.height || 1)) * previewImageRef.current.offsetHeight}px`,
+                            }}
+                            data-testid="overlay-qr-selection"
+                          >
+                            {isQrSelected && (
+                              <>
+                                <div
+                                  className="absolute w-3 h-3 bg-primary rounded-full cursor-nwse-resize -top-1.5 -left-1.5 border-2 border-background"
+                                  onPointerDown={(e) => handleResizePointerDown(e, "nw")}
+                                  data-testid="handle-nw"
+                                />
+                                <div
+                                  className="absolute w-3 h-3 bg-primary rounded-full cursor-nesw-resize -top-1.5 -right-1.5 border-2 border-background"
+                                  onPointerDown={(e) => handleResizePointerDown(e, "ne")}
+                                  data-testid="handle-ne"
+                                />
+                                <div
+                                  className="absolute w-3 h-3 bg-primary rounded-full cursor-nesw-resize -bottom-1.5 -left-1.5 border-2 border-background"
+                                  onPointerDown={(e) => handleResizePointerDown(e, "sw")}
+                                  data-testid="handle-sw"
+                                />
+                                <div
+                                  className="absolute w-3 h-3 bg-primary rounded-full cursor-nwse-resize -bottom-1.5 -right-1.5 border-2 border-background"
+                                  onPointerDown={(e) => handleResizePointerDown(e, "se")}
+                                  data-testid="handle-se"
+                                />
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div
