@@ -433,6 +433,29 @@ export default function OverlayGeneratorPage() {
     return displayWidth / canvasWidth;
   };
 
+  const getOverlayBounds = () => {
+    if (!previewImageRef.current || !platformConfig || !isBannerTemplate) return null;
+    
+    const scaleFactor = getScaleFactor();
+    const effectiveWidth = Math.min(platformConfig.width, overlayWidth);
+    const effectiveHeight = Math.min(platformConfig.height, overlayHeight);
+    const offsetX = Math.max(0, Math.round((platformConfig.width - effectiveWidth) / 2));
+    
+    let overlayY = 0;
+    if (selectedTemplate === "banner-top") {
+      overlayY = platformConfig.safeZone?.top ?? 0;
+    } else {
+      overlayY = platformConfig.height - effectiveHeight - (platformConfig.safeZone?.bottom ?? 0);
+    }
+    
+    return {
+      x: offsetX * scaleFactor,
+      y: overlayY * scaleFactor,
+      width: effectiveWidth * scaleFactor,
+      height: effectiveHeight * scaleFactor
+    };
+  };
+
   const handleQrPointerDown = (e: React.PointerEvent) => {
     if (!qrBounds || !previewImageRef.current) return;
     
@@ -660,10 +683,24 @@ export default function OverlayGeneratorPage() {
       }
     }
     
-    e.preventDefault();
-    e.stopPropagation();
-    setIsBannerSelected(true);
-    setIsQrSelected(false);
+    const overlayBounds = getOverlayBounds();
+    if (overlayBounds) {
+      const isInOverlay = 
+        clickX >= overlayBounds.x &&
+        clickX <= overlayBounds.x + overlayBounds.width &&
+        clickY >= overlayBounds.y &&
+        clickY <= overlayBounds.y + overlayBounds.height;
+      
+      if (isInOverlay) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsBannerSelected(true);
+        setIsQrSelected(false);
+      } else {
+        setIsBannerSelected(false);
+        setIsQrSelected(false);
+      }
+    }
   };
 
   const handleBannerResizePointerDown = (e: React.PointerEvent, handle: string) => {
@@ -1243,7 +1280,7 @@ export default function OverlayGeneratorPage() {
                 </CardTitle>
                 <CardDescription>
                   {isBannerTemplate 
-                    ? "Click QR code to select and drag to move, or click banner background to resize banner dimensions"
+                    ? "Click QR code to select and drag to move, or click the purple overlay section to resize it"
                     : "Click the QR code to select it, then drag to move or use corner handles to resize"}
                 </CardDescription>
               </CardHeader>
@@ -1271,18 +1308,14 @@ export default function OverlayGeneratorPage() {
                     >
                       <div className="relative">
                         <div 
-                          className={`relative ${isBannerTemplate && isBannerSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+                          className="relative"
                           onPointerDown={handleBannerClick}
                         >
                           <img
                             ref={previewImageRef}
                             src={previewUrl}
                             alt="Overlay preview"
-                            className={`max-h-[600px] w-auto rounded-lg shadow-lg select-none transition-all ${
-                              isBannerTemplate && isBannerSelected 
-                                ? 'border-2 border-primary' 
-                                : 'border-2 border-border/50'
-                            }`}
+                            className="max-h-[600px] w-auto rounded-lg shadow-lg select-none border-2 border-border/50"
                             style={{
                               aspectRatio: platformConfig?.aspectRatio || "9/16",
                               pointerEvents: "none"
@@ -1290,51 +1323,98 @@ export default function OverlayGeneratorPage() {
                             data-testid="img-preview"
                           />
                           
-                          {isBannerTemplate && isBannerSelected && previewImageRef.current && (
-                            <>
-                              <div
-                                className="absolute w-4 h-4 bg-primary rounded-full cursor-nwse-resize -top-2 -left-2 border-2 border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "nw")}
-                                data-testid="banner-handle-nw"
-                              />
-                              <div
-                                className="absolute w-4 h-4 bg-primary rounded-full cursor-nesw-resize -top-2 -right-2 border-2 border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "ne")}
-                                data-testid="banner-handle-ne"
-                              />
-                              <div
-                                className="absolute w-4 h-4 bg-primary rounded-full cursor-nesw-resize -bottom-2 -left-2 border-2 border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "sw")}
-                                data-testid="banner-handle-sw"
-                              />
-                              <div
-                                className="absolute w-4 h-4 bg-primary rounded-full cursor-nwse-resize -bottom-2 -right-2 border-2 border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "se")}
-                                data-testid="banner-handle-se"
-                              />
-                              
-                              <div
-                                className="absolute h-2 bg-primary/50 cursor-ns-resize -top-1 left-1/2 -translate-x-1/2 w-16 rounded-full border border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "top")}
-                                data-testid="banner-handle-top"
-                              />
-                              <div
-                                className="absolute h-2 bg-primary/50 cursor-ns-resize -bottom-1 left-1/2 -translate-x-1/2 w-16 rounded-full border border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "bottom")}
-                                data-testid="banner-handle-bottom"
-                              />
-                              <div
-                                className="absolute w-2 bg-primary/50 cursor-ew-resize -left-1 top-1/2 -translate-y-1/2 h-16 rounded-full border border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "left")}
-                                data-testid="banner-handle-left"
-                              />
-                              <div
-                                className="absolute w-2 bg-primary/50 cursor-ew-resize -right-1 top-1/2 -translate-y-1/2 h-16 rounded-full border border-background pointer-events-auto"
-                                onPointerDown={(e) => handleBannerResizePointerDown(e, "right")}
-                                data-testid="banner-handle-right"
-                              />
-                            </>
-                          )}
+                          {isBannerTemplate && isBannerSelected && (() => {
+                            const overlayBounds = getOverlayBounds();
+                            if (!overlayBounds) return null;
+                            
+                            return (
+                              <>
+                                <div
+                                  className="absolute border-2 border-dashed border-primary pointer-events-none"
+                                  style={{
+                                    left: `${overlayBounds.x}px`,
+                                    top: `${overlayBounds.y}px`,
+                                    width: `${overlayBounds.width}px`,
+                                    height: `${overlayBounds.height}px`,
+                                  }}
+                                />
+                                
+                                <div
+                                  className="absolute w-4 h-4 bg-primary rounded-full cursor-nwse-resize border-2 border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x - 8}px`,
+                                    top: `${overlayBounds.y - 8}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "nw")}
+                                  data-testid="banner-handle-nw"
+                                />
+                                <div
+                                  className="absolute w-4 h-4 bg-primary rounded-full cursor-nesw-resize border-2 border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x + overlayBounds.width - 8}px`,
+                                    top: `${overlayBounds.y - 8}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "ne")}
+                                  data-testid="banner-handle-ne"
+                                />
+                                <div
+                                  className="absolute w-4 h-4 bg-primary rounded-full cursor-nesw-resize border-2 border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x - 8}px`,
+                                    top: `${overlayBounds.y + overlayBounds.height - 8}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "sw")}
+                                  data-testid="banner-handle-sw"
+                                />
+                                <div
+                                  className="absolute w-4 h-4 bg-primary rounded-full cursor-nwse-resize border-2 border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x + overlayBounds.width - 8}px`,
+                                    top: `${overlayBounds.y + overlayBounds.height - 8}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "se")}
+                                  data-testid="banner-handle-se"
+                                />
+                                
+                                <div
+                                  className="absolute h-2 bg-primary/50 cursor-ns-resize w-16 rounded-full border border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x + overlayBounds.width / 2 - 32}px`,
+                                    top: `${overlayBounds.y - 4}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "top")}
+                                  data-testid="banner-handle-top"
+                                />
+                                <div
+                                  className="absolute h-2 bg-primary/50 cursor-ns-resize w-16 rounded-full border border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x + overlayBounds.width / 2 - 32}px`,
+                                    top: `${overlayBounds.y + overlayBounds.height - 4}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "bottom")}
+                                  data-testid="banner-handle-bottom"
+                                />
+                                <div
+                                  className="absolute w-2 bg-primary/50 cursor-ew-resize h-16 rounded-full border border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x - 4}px`,
+                                    top: `${overlayBounds.y + overlayBounds.height / 2 - 32}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "left")}
+                                  data-testid="banner-handle-left"
+                                />
+                                <div
+                                  className="absolute w-2 bg-primary/50 cursor-ew-resize h-16 rounded-full border border-background pointer-events-auto"
+                                  style={{
+                                    left: `${overlayBounds.x + overlayBounds.width - 4}px`,
+                                    top: `${overlayBounds.y + overlayBounds.height / 2 - 32}px`,
+                                  }}
+                                  onPointerDown={(e) => handleBannerResizePointerDown(e, "right")}
+                                  data-testid="banner-handle-right"
+                                />
+                              </>
+                            );
+                          })()}
                         </div>
                         {qrBounds && previewImageRef.current && (
                           <div
