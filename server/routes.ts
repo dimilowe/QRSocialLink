@@ -98,9 +98,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const dynamicSlug = nanoid(10);
       const validatedData = insertScanSchema.parse({
         ...req.body,
         userId: req.user.id,
+        dynamicSlug,
       });
       const scan = await storage.createScan(validatedData);
       res.json(scan);
@@ -619,6 +621,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.incrementDestinationImpressions(selectedDestination.id);
 
       res.redirect(302, selectedDestination.url);
+    } catch (error: any) {
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Error - QR Social</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+              .container { max-width: 400px; }
+              h1 { color: #ef4444; font-size: 36px; margin: 0 0 16px 0; }
+              p { color: #a0a0a0; line-height: 1.6; }
+              a { color: #9333ea; text-decoration: none; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>Error</h1>
+              <p>Something went wrong while processing this QR code. Please try again later.</p>
+              <p><a href="/">Visit QR Social</a></p>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  app.get("/q/:slug", async (req, res) => {
+    try {
+      const scan = await storage.getScanBySlug(req.params.slug);
+      if (!scan) {
+        return res.status(404).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>QR Code Not Found - QR Social</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                .container { max-width: 400px; }
+                h1 { color: #9333ea; font-size: 48px; margin: 0 0 16px 0; }
+                p { color: #a0a0a0; line-height: 1.6; }
+                a { color: #9333ea; text-decoration: none; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>404</h1>
+                <p>QR code not found. This QR code may have been deleted or the link is invalid.</p>
+                <p><a href="/">Visit QR Social</a></p>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      const destinationUrl = scan.redirectUrl || scan.decodedUrl;
+      
+      if (!destinationUrl) {
+        return res.status(500).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Configuration Error - QR Social</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                .container { max-width: 400px; }
+                h1 { color: #ef4444; font-size: 36px; margin: 0 0 16px 0; }
+                p { color: #a0a0a0; line-height: 1.6; }
+                a { color: #9333ea; text-decoration: none; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Configuration Error</h1>
+                <p>This QR code hasn't been configured properly. Please contact the QR code owner.</p>
+                <p><a href="/">Visit QR Social</a></p>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      try {
+        new URL(destinationUrl);
+      } catch {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Invalid URL - QR Social</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+                .container { max-width: 400px; }
+                h1 { color: #ef4444; font-size: 36px; margin: 0 0 16px 0; }
+                p { color: #a0a0a0; line-height: 1.6; }
+                a { color: #9333ea; text-decoration: none; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>Invalid URL</h1>
+                <p>The destination URL for this QR code is invalid.</p>
+                <p><a href="/">Visit QR Social</a></p>
+              </div>
+            </body>
+          </html>
+        `);
+      }
+
+      const ipHash = crypto
+        .createHash("sha256")
+        .update((req.ip || "unknown") + (process.env.SESSION_SECRET || "salt"))
+        .digest("hex");
+
+      const userAgentString = req.headers["user-agent"] || "";
+      const parser = new UAParser(userAgentString);
+      const uaResult = parser.getResult();
+      
+      const deviceType = uaResult.device.type || (uaResult.device.vendor ? 'mobile' : 'desktop');
+      const platform = detectPlatform(req.headers.referer || null);
+
+      await storage.createScanEvent({
+        campaignId: scan.campaignId || null,
+        destinationId: null,
+        frameId: null,
+        scanId: scan.id,
+        userAgent: userAgentString || null,
+        ipHash,
+        referrer: req.headers.referer || null,
+        country: null,
+        platform,
+        deviceType,
+        os: uaResult.os.name || null,
+        osVersion: uaResult.os.version || null,
+        browser: uaResult.browser.name || null,
+        browserVersion: uaResult.browser.version || null,
+      });
+
+      res.redirect(302, destinationUrl);
     } catch (error: any) {
       res.status(500).send(`
         <!DOCTYPE html>

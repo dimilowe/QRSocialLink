@@ -492,13 +492,37 @@ export default function CreateQRPage() {
         throw new Error(errorData.message || "Failed to create QR code");
       }
       
-      return response.json();
+      const savedScan = await response.json();
+      
+      if (savedScan.dynamicSlug) {
+        const trackingUrl = `${window.location.origin}/q/${savedScan.dynamicSlug}`;
+        
+        const QRCode = (await import("qrcode")).default;
+        const trackingQrDataUrl = await QRCode.toDataURL(trackingUrl, {
+          width: 512,
+          margin: 1,
+          color: {
+            dark: foregroundColor,
+            light: backgroundColor,
+          },
+        });
+
+        const updateResponse = await apiRequest("PATCH", `/api/scans/${savedScan.id}`, {
+          qrImageUrl: trackingQrDataUrl,
+        });
+        
+        if (!updateResponse.ok) {
+          console.error("Failed to update QR with tracking URL");
+        }
+      }
+      
+      return savedScan;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/scans"] });
       toast({
         title: "QR Code created!",
-        description: "Your QR code has been saved to your dashboard",
+        description: "Analytics-enabled QR code saved to your dashboard",
       });
       setLocation("/dashboard");
     },

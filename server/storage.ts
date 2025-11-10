@@ -54,6 +54,7 @@ export interface IStorage {
   
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: string): Promise<Scan | undefined>;
+  getScanBySlug(slug: string): Promise<Scan | undefined>;
   updateScan(scanId: string, updates: Partial<Scan>): Promise<Scan>;
   updateScanRedirectUrl(scanId: string, redirectUrl: string | null): Promise<Scan>;
   getUserScans(userId: string, limit?: number): Promise<Scan[]>;
@@ -181,6 +182,11 @@ export class DatabaseStorage implements IStorage {
 
   async getScan(id: string): Promise<Scan | undefined> {
     const result = await db.select().from(scans).where(eq(scans.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getScanBySlug(slug: string): Promise<Scan | undefined> {
+    const result = await db.select().from(scans).where(eq(scans.dynamicSlug, slug)).limit(1);
     return result[0];
   }
 
