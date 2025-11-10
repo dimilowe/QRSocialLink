@@ -62,6 +62,7 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 **Feature Specifications:**
 - **Authentication**: Email/password via Passport.js, session-based with protected routes.
 - **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG/GIF (animated), storage, and history. Editable destinations for paid plans.
+  - **Scan Tracking**: Individual QR codes use `/q/:slug` tracking URLs (generated with nanoid). After saving, QR codes are automatically regenerated with tracking URLs while preserving all custom branding (shapes, colors, GIFs, text, watermarks). The `generateBrandedQR()` function is fully self-contained and reusable across preview and tracking regeneration flows.
 - **Subscription Model**: Preview-only free access + 3 paid tiers (Starter $10/mo, Pro $30/mo, Unlimited $99/mo). Free users can build and preview QR codes but cannot save or download. Feature-based limits (canSave, canDownload) enforced by the backend, integrated with Stripe checkout and dynamic updates via webhooks.
 - **Campaigns & A/B Testing**: CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
 - **Advanced Analytics**: 
