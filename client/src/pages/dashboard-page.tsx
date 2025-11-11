@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutDashboard, Edit, Sparkles, Download, Eye, QrCode, Frame } from "lucide-react";
+import { LayoutDashboard, Edit, Sparkles, Download, Eye, QrCode, Frame, Trash2 } from "lucide-react";
 import type { Scan, OverlayRendition } from "@shared/schema";
 import { EditQRModal } from "@/components/edit-qr-modal";
 
@@ -94,6 +95,32 @@ export default function DashboardPage() {
   const handleDownloadOverlay = (overlay: OverlayRendition) => {
     if (!overlay.outputPath) return;
     window.open(overlay.outputPath, '_blank');
+  };
+
+  const deleteOverlayMutation = useMutation({
+    mutationFn: async (overlayId: string) => {
+      return apiRequest('DELETE', `/api/overlays/${overlayId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/overlays'] });
+      toast({
+        title: "Overlay deleted",
+        description: "The overlay has been successfully deleted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete overlay",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteOverlay = (overlayId: string) => {
+    if (confirm("Are you sure you want to delete this overlay?")) {
+      deleteOverlayMutation.mutate(overlayId);
+    }
   };
 
   const createdScans = scans || [];
@@ -225,12 +252,12 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {createdOverlays.map((overlay) => (
               <Card key={overlay.id} className="p-4 space-y-4" data-testid={`card-overlay-${overlay.id}`}>
-                <div className="aspect-[9/16] bg-muted rounded-lg overflow-hidden flex items-center justify-center">
+                <div className="aspect-[9/16] bg-muted rounded-lg overflow-hidden flex items-center justify-center p-2">
                   {overlay.status === "completed" && overlay.outputPath ? (
                     <img
                       src={overlay.outputPath}
                       alt="Generated Overlay"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       data-testid={`img-overlay-${overlay.id}`}
                     />
                   ) : overlay.status === "rendering" ? (
@@ -264,16 +291,28 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={() => handleDownloadOverlay(overlay)}
-                  disabled={overlay.status !== "completed"}
-                  data-testid={`button-download-overlay-${overlay.id}`}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {overlay.status === "completed" ? "Download" : "Not Ready"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => handleDownloadOverlay(overlay)}
+                    disabled={overlay.status !== "completed"}
+                    data-testid={`button-download-overlay-${overlay.id}`}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => handleDeleteOverlay(overlay.id)}
+                    disabled={deleteOverlayMutation.isPending}
+                    data-testid={`button-delete-overlay-${overlay.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>

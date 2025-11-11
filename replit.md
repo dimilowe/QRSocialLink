@@ -101,7 +101,9 @@ This configuration has been battle-tested and resolves SSL certificate issues th
     - Status workflow: queued → rendering → completed/failed with error tracking
     - Temp file cleanup ensures no disk space leaks
     - Generated overlays saved to server/output/overlays/{renditionId}.png
-  - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history), GET /api/overlays/:id/download (serves rendered PNG).
+  - **Coordinate Scaling System**: Preview-to-output coordinate transformation ensures generated overlays match editor preview exactly. Frontend captures base layout values (qrBaseSize, qrBaseX, qrBaseY) from preview canvas, scales them to actual overlay dimensions using scaleX/scaleY ratios, and sends to backend. Backend uses base values with percentage modifiers for precise positioning. Backward compatible with centering fallback for legacy overlays.
+  - **Dashboard Overlay Gallery**: Toggle view between QR codes and overlays on dashboard page. Overlays displayed with 9:16 aspect ratio using object-contain for full banner visibility. Each overlay card shows status badge, creation date, CTA text, and download/delete buttons. Delete functionality with confirmation and optimistic cache invalidation.
+  - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history), GET /api/overlays/:id/download (serves rendered PNG), DELETE /api/overlays/:id (deletes overlay rendition).
   - Security: All endpoints require authentication, proper authorization (user owns QR code), input validation with max length enforcement.
 
 ## External Dependencies
