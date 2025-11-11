@@ -204,6 +204,16 @@ export const scanEvents = pgTable("scan_events", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
+export const feedback = pgTable("feedback", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  type: text("type").notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -289,6 +299,18 @@ export const insertScanEventSchema = createInsertSchema(scanEvents).omit({
   timestamp: true,
 });
 
+export const insertFeedbackSchema = createInsertSchema(feedback)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    type: z.enum(["bug_report", "feature_request", "improvement", "general"]),
+    subject: z.string().min(1, "Subject is required").max(200),
+    message: z.string().min(10, "Message must be at least 10 characters").max(2000),
+    email: z.string().email("Invalid email address"),
+  });
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -321,6 +343,9 @@ export type OverlayRendition = typeof overlayRenditions.$inferSelect;
 
 export type InsertScanEvent = z.infer<typeof insertScanEventSchema>;
 export type ScanEvent = typeof scanEvents.$inferSelect;
+
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type Feedback = typeof feedback.$inferSelect;
 
 export type ScanWithUser = Scan & {
   user: User;
