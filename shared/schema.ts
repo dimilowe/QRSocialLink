@@ -160,6 +160,9 @@ export type RenderConfig = {
   qrSizeModifier?: number;
   qrXOffset?: number;
   qrYOffset?: number;
+  qrBaseSize?: number;
+  qrBaseX?: number;
+  qrBaseY?: number;
   overlayColor?: string;
   overlayBackgroundImage?: string;
   overlayImageFit?: "cover" | "contain" | "stretch";
@@ -261,6 +264,9 @@ export const insertOverlayRenditionSchema = createInsertSchema(overlayRenditions
     qrSizeModifier: z.number().optional(),
     qrXOffset: z.number().optional(),
     qrYOffset: z.number().optional(),
+    qrBaseSize: z.number().optional(),
+    qrBaseX: z.number().optional(),
+    qrBaseY: z.number().optional(),
     overlayColor: z.string().optional(),
     overlayBackgroundImage: z.string().optional(),
     overlayImageFit: z.enum(["cover", "contain", "stretch"]).optional(),

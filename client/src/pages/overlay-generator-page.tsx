@@ -40,6 +40,16 @@ export default function OverlayGeneratorPage() {
   const [overlayWidth, setOverlayWidth] = useState<number>(1080);
   const [overlayHeight, setOverlayHeight] = useState<number>(400);
   
+  const [scaledLayout, setScaledLayout] = useState<{
+    qrSize: number;
+    qrX: number;
+    qrY: number;
+    overlayX: number;
+    overlayY: number;
+    overlayWidth: number;
+    overlayHeight: number;
+  } | null>(null);
+  
   const [qrBounds, setQrBounds] = useState<{x: number, y: number, size: number} | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState<boolean>(false);
@@ -555,6 +565,16 @@ export default function OverlayGeneratorPage() {
         ctx.drawImage(qrImage, qrXAdjusted, qrYAdjusted, qrSizeAdjusted, qrSizeAdjusted);
         
         setQrBounds({ x: qrXAdjusted, y: qrYAdjusted, size: qrSizeAdjusted });
+        
+        setScaledLayout({
+          qrSize: scaledQR.size,
+          qrX: scaledQR.x,
+          qrY: scaledQR.y,
+          overlayX: scaledOverlay.x,
+          overlayY: scaledOverlay.y,
+          overlayWidth: scaledOverlay.width,
+          overlayHeight: scaledOverlay.height,
+        });
 
         if (ctaText && scaledCTA) {
           const brightness = parseInt(textColor.slice(1, 3), 16) * 0.299 + 
@@ -1658,7 +1678,11 @@ export default function OverlayGeneratorPage() {
                     size="lg"
                     disabled={!selectedQR || !selectedTemplate || generateOverlayMutation.isPending}
                     onClick={() => {
-                      if (!selectedQR || !selectedTemplate || !platformConfig) return;
+                      if (!selectedQR || !selectedTemplate || !platformConfig || !scaledLayout) return;
+                      
+                      const scaleX = overlayWidth / scaledLayout.overlayWidth;
+                      const scaleY = overlayHeight / scaledLayout.overlayHeight;
+                      const avgScale = (scaleX + scaleY) / 2;
                       
                       generateOverlayMutation.mutate({
                         scanId: selectedQR,
@@ -1672,6 +1696,9 @@ export default function OverlayGeneratorPage() {
                           qrSizeModifier,
                           qrXOffset,
                           qrYOffset,
+                          qrBaseSize: Math.round(scaledLayout.qrSize * avgScale),
+                          qrBaseX: Math.round((scaledLayout.qrX - scaledLayout.overlayX) * scaleX),
+                          qrBaseY: Math.round((scaledLayout.qrY - scaledLayout.overlayY) * scaleY),
                           overlayColor,
                           overlayBackgroundImage,
                           overlayImageFit,

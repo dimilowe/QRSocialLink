@@ -102,6 +102,9 @@ export class OverlayProcessor {
         qrXOffset = 0,
         qrYOffset = 0,
         qrSizeModifier = 1,
+        qrBaseSize,
+        qrBaseX,
+        qrBaseY,
         textColor = "#ffffff",
         textFont = "Arial",
         textSize = 48,
@@ -130,9 +133,19 @@ export class OverlayProcessor {
         await fs.writeFile(qrPath, qrBuffer);
       }
 
-      const qrScale = Math.min(Math.max(200 * qrSizeModifier, 50), 800);
-      const qrX = (overlayWidth / 2) - (qrScale / 2) + qrXOffset;
-      const qrY = (overlayHeight / 2) - (qrScale / 2) + qrYOffset;
+      let qrScale: number;
+      let qrX: number;
+      let qrY: number;
+      
+      if (qrBaseSize !== undefined && qrBaseX !== undefined && qrBaseY !== undefined) {
+        qrScale = Math.min(Math.max(qrBaseSize * (qrSizeModifier / 100), 50), 800);
+        qrX = qrBaseX + qrXOffset;
+        qrY = qrBaseY + qrYOffset;
+      } else {
+        qrScale = Math.min(Math.max(200 * (qrSizeModifier / 100), 50), 800);
+        qrX = (overlayWidth / 2) - (qrScale / 2) + qrXOffset;
+        qrY = (overlayHeight / 2) - (qrScale / 2) + qrYOffset;
+      }
 
       const overlayPanelPath = path.join(tempDir, "panel.png");
       
