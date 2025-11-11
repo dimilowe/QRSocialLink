@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, insertFeedbackSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
@@ -1370,6 +1370,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Overlay generation error:', error);
       res.status(500).json({ message: error.message || "Failed to generate overlay" });
+    }
+  });
+
+  app.post("/api/feedback", async (req, res) => {
+    try {
+      const userId = req.isAuthenticated() ? req.user.id : null;
+      
+      const validatedData = insertFeedbackSchema.parse({
+        ...req.body,
+        userId,
+      });
+
+      const feedbackSubmission = await storage.createFeedback(validatedData);
+      
+      res.json({ 
+        message: "Thank you for your feedback! We appreciate you taking the time to help us improve.",
+        id: feedbackSubmission.id 
+      });
+    } catch (error: any) {
+      console.error('Feedback submission error:', error);
+      res.status(400).json({ message: error.message || "Failed to submit feedback" });
     }
   });
 
