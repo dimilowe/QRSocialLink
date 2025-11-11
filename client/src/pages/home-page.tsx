@@ -2,7 +2,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { QrCode, BarChart3, Target, Zap, Video, TrendingUp } from "lucide-react";
+import { QrCode, BarChart3, Target, Zap, Video, TrendingUp, MessageSquare } from "lucide-react";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -95,6 +95,20 @@ export default function HomePage() {
               </CardContent>
             </Card>
           </div>
+
+          <footer className="mt-16 py-8 border-t">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-4">
+                Have feedback or suggestions? We'd love to hear from you.
+              </p>
+              <Link href="/feedback">
+                <Button variant="outline" data-testid="button-feedback">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Share Feedback
+                </Button>
+              </Link>
+            </div>
+          </footer>
         </div>
       </div>
     );
@@ -155,6 +169,20 @@ export default function HomePage() {
             </Card>
           </Link>
         </div>
+
+        <footer className="mt-16 py-8 border-t">
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">
+              Have feedback or suggestions? We'd love to hear from you.
+            </p>
+            <Link href="/feedback">
+              <Button variant="outline" data-testid="button-feedback">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Share Feedback
+              </Button>
+            </Link>
+          </div>
+        </footer>
       </div>
     </div>
   );
