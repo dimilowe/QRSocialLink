@@ -12,6 +12,7 @@ import {
   frames,
   overlayRenditions,
   scanEvents,
+  feedback,
   type User,
   type InsertUser,
   type Scan,
@@ -34,6 +35,8 @@ import {
   type InsertOverlayRendition,
   type ScanEvent,
   type InsertScanEvent,
+  type Feedback,
+  type InsertFeedback,
   type ScanWithUser,
   type CommentWithUser,
   type CampaignWithStats,
@@ -110,6 +113,9 @@ export interface IStorage {
   getUserOverlayRenditions(userId: string): Promise<OverlayRendition[]>;
   claimQueuedOverlayRendition(): Promise<OverlayRendition | null>;
   updateOverlayRendition(id: string, updates: Partial<OverlayRendition>): Promise<OverlayRendition>;
+  deleteOverlayRendition(id: string): Promise<void>;
+  
+  createFeedback(insertFeedback: InsertFeedback): Promise<Feedback>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -619,6 +625,11 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(overlayRenditions)
       .where(eq(overlayRenditions.id, id));
+  }
+
+  async createFeedback(insertFeedback: InsertFeedback): Promise<Feedback> {
+    const result = await db.insert(feedback).values(insertFeedback).returning();
+    return result[0];
   }
 }
 
