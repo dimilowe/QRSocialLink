@@ -16,6 +16,7 @@ import DashboardPage from "@/pages/dashboard-page";
 import CampaignsPage from "@/pages/campaigns-page";
 import CampaignDetailPage from "@/pages/campaign-detail-page";
 import OverlayGeneratorPage from "@/pages/overlay-generator-page";
+import FeedbackPage from "@/pages/feedback-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -58,6 +59,7 @@ function Router() {
         </Route>
         <Route path="/" component={HomePage} />
         <Route path="/pricing" component={PricingPage} />
+        <Route path="/feedback" component={FeedbackPage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
