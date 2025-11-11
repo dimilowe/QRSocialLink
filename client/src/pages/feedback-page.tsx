@@ -143,8 +143,8 @@ export default function FeedbackPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="bug" data-testid="option-bug">Bug Report</SelectItem>
-                            <SelectItem value="feature" data-testid="option-feature">Feature Request</SelectItem>
+                            <SelectItem value="bug_report" data-testid="option-bug">Bug Report</SelectItem>
+                            <SelectItem value="feature_request" data-testid="option-feature">Feature Request</SelectItem>
                             <SelectItem value="improvement" data-testid="option-improvement">Improvement Suggestion</SelectItem>
                             <SelectItem value="general" data-testid="option-general">General Feedback</SelectItem>
                           </SelectContent>
