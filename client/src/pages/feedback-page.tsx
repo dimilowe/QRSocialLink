@@ -136,17 +136,17 @@ export default function FeedbackPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Feedback Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-feedback-type" className="h-12">
                               <SelectValue placeholder="Select feedback type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="bug">Bug Report</SelectItem>
-                            <SelectItem value="feature">Feature Request</SelectItem>
-                            <SelectItem value="improvement">Improvement Suggestion</SelectItem>
-                            <SelectItem value="general">General Feedback</SelectItem>
+                            <SelectItem value="bug" data-testid="option-bug">Bug Report</SelectItem>
+                            <SelectItem value="feature" data-testid="option-feature">Feature Request</SelectItem>
+                            <SelectItem value="improvement" data-testid="option-improvement">Improvement Suggestion</SelectItem>
+                            <SelectItem value="general" data-testid="option-general">General Feedback</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>

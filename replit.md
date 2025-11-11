@@ -105,6 +105,11 @@ This configuration has been battle-tested and resolves SSL certificate issues th
   - **Dashboard Overlay Gallery**: Toggle view between QR codes and overlays on dashboard page. Overlays displayed with 9:16 aspect ratio using object-contain for full banner visibility. Each overlay card shows status badge, creation date, CTA text, and download/delete buttons. Delete functionality with confirmation and optimistic cache invalidation.
   - API endpoints: GET /api/overlay-templates (requires auth), POST /api/overlays/generate (validated with insertOverlayRenditionSchema), GET /api/overlays (user's overlay history), GET /api/overlays/:id/download (serves rendered PNG), DELETE /api/overlays/:id (deletes overlay rendition).
   - Security: All endpoints require authentication, proper authorization (user owns QR code), input validation with max length enforcement.
+- **Feedback System**: User feedback collection for continuous improvement.
+  - **Database Schema**: Feedback table stores type (bug/feature/improvement/general), subject, message, email, and optional userId for authenticated users.
+  - **Frontend**: Dedicated feedback form page (`/feedback`) with controlled Select component for feedback type, subject input, message textarea, and email field. Form validation via Zod, success/error handling with toast notifications. Footer buttons on homepage (guest and logged-in views) link to feedback page.
+  - **Backend**: POST /api/feedback endpoint accepts feedback from both authenticated and guest users. Validates input with insertFeedbackSchema, stores submissions, returns success message.
+  - **UX Features**: Success state with "Submit Another" and "Return Home" actions. All interactive elements have data-testid attributes for testing. Email field pre-populated for authenticated users, required for guests.
 
 ## External Dependencies
 
