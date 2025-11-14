@@ -50,8 +50,8 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserStripeInfo(
     userId: string,
-    customerId: string,
-    subscriptionId: string
+    customerId: string | null,
+    subscriptionId: string | null
   ): Promise<User>;
   updateUserPlan(userId: string, plan: string): Promise<User>;
   
@@ -158,15 +158,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateUserStripeInfo(
     userId: string,
-    customerId: string,
-    subscriptionId: string
+    customerId: string | null,
+    subscriptionId: string | null
   ): Promise<User> {
     const result = await db
       .update(users)
       .set({
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
-        plan: "pro",
       })
       .where(eq(users.id, userId))
       .returning();

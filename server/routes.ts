@@ -984,6 +984,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const customerId = session.customer as string;
+          const subscriptionId = session.subscription as string;
+          const userId = session.metadata?.userId;
+          const planTier = (session.metadata?.planTier || "pro") as PlanTier;
+
+          if (userId && customerId && subscriptionId) {
+            await storage.updateUserStripeInfo(userId, customerId, subscriptionId);
+            await storage.updateUserPlan(userId, planTier);
+            console.log(`Checkout completed: User ${userId} subscribed to ${planTier}`);
+          }
+          break;
+        }
+
         case "invoice.paid": {
           const invoice = event.data.object as Stripe.Invoice;
           const customerId = invoice.customer as string;
@@ -1050,12 +1065,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/get-or-create-subscription", async (req, res) => {
+  app.post("/api/create-checkout-session", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.sendStatus(401);
     }
 
-    let user = req.user;
+    const user = req.user;
     const { planTier } = req.body;
 
     if (!planTier || !["starter", "pro", "enterprise"].includes(planTier)) {
@@ -1073,11 +1088,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const customer = await stripe.customers.create({
           email: user.email,
           name: user.username,
+          metadata: {
+            userId: user.id,
+          },
         });
         customerId = customer.id;
+        await storage.updateUserStripeInfo(user.id, customerId, null);
       }
-
-      const planConfig = PLAN_PRICES[planTier as keyof typeof PLAN_PRICES];
 
       if (user.stripeSubscriptionId) {
         try {
@@ -1087,104 +1104,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const currentPlanTier = subscription.metadata?.planTier;
 
-        if (currentPlanTier === planTier) {
-          return res.send({
-            subscriptionId: subscription.id,
-            success: true,
-            message: `You already have the ${planConfig.name} plan`,
-          });
-        }
-
-        const newPrice = await stripe.prices.create({
-          currency: "usd",
-          unit_amount: planConfig.amount,
-          recurring: {
-            interval: "month",
-          },
-          product_data: {
-            name: planConfig.name,
-          } as any,
-        });
-
-        const updatedSubscription = await stripe.subscriptions.update(
-          user.stripeSubscriptionId,
-          {
-            items: [{
-              id: subscription.items.data[0].id,
-              price: newPrice.id,
-            }],
-            metadata: {
-              planTier: planTier,
-            },
-            proration_behavior: "create_prorations",
-            expand: ["latest_invoice.payment_intent"],
+          if (currentPlanTier === planTier) {
+            return res.send({
+              success: true,
+              message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
+            });
           }
-        );
-
-        const invoice = updatedSubscription.latest_invoice as any;
-        const paymentIntent = invoice?.payment_intent as any;
-
-        if (!paymentIntent || paymentIntent.status === "succeeded") {
-          await storage.updateUserPlan(user.id, planTier as PlanTier);
-          
-          return res.send({
-            subscriptionId: updatedSubscription.id,
-            success: true,
-            message: "Subscription updated successfully",
-          });
-        }
-
-        return res.send({
-          subscriptionId: updatedSubscription.id,
-          clientSecret: paymentIntent?.client_secret,
-        });
         } catch (subscriptionError: any) {
           if (subscriptionError.message?.includes('test mode') || subscriptionError.message?.includes('live mode')) {
-            console.log(`Test/Live mode mismatch detected. Clearing old Stripe data for user ${user.id} and creating fresh subscription.`);
-            
-            const customer = await stripe.customers.create({
-              email: user.email,
-              name: user.username,
-            });
-            customerId = customer.id;
-          } else {
-            throw subscriptionError;
+            console.log(`Test/Live mode mismatch detected. Clearing old Stripe data for user ${user.id}.`);
+            await storage.updateUserStripeInfo(user.id, customerId, null);
           }
         }
       }
 
-      const price = await stripe.prices.create({
-        currency: "usd",
-        unit_amount: planConfig.amount,
-        recurring: {
-          interval: "month",
-        },
-        product_data: {
-          name: planConfig.name,
-        } as any,
-      });
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://qrsocial.studio'
+        : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
 
-      const subscription = await stripe.subscriptions.create({
+      const session = await stripe.checkout.sessions.create({
         customer: customerId,
-        items: [{ price: price.id }],
-        payment_behavior: "default_incomplete",
-        payment_settings: { save_default_payment_method: "on_subscription" },
-        expand: ["latest_invoice.payment_intent"],
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name,
+                description: `QR Social ${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan`,
+              },
+              unit_amount: PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].amount,
+              recurring: {
+                interval: 'month',
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${baseUrl}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/pricing`,
         metadata: {
+          userId: user.id,
           planTier: planTier,
         },
+        subscription_data: {
+          metadata: {
+            userId: user.id,
+            planTier: planTier,
+          },
+        },
       });
-
-      await storage.updateUserStripeInfo(user.id, customerId, subscription.id);
-
-      const invoice = subscription.latest_invoice as any;
-      const paymentIntent = invoice?.payment_intent as any;
 
       res.send({
-        subscriptionId: subscription.id,
-        clientSecret: paymentIntent.client_secret,
+        sessionId: session.id,
+        url: session.url,
       });
     } catch (error: any) {
+      console.error('Checkout session error:', error);
       return res.status(400).send({ error: { message: error.message } });
     }
   });
