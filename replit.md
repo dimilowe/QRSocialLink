@@ -55,7 +55,13 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 - **QR Code Handling**: `html5-qrcode` for camera scanning, `jsqr` for image upload, `qrcode` for generation, `gifler` for animated GIF backgrounds.
 - **A/B Testing**: Implemented with `WeightedRandomStrategy` and `EpsilonGreedyStrategy` (multi-armed bandit algorithm).
 - **Analytics**: Detailed scan event logging with privacy-friendly IP hashing, user agent parsing (UAParser) for device, OS, browser, and platform detection.
-- **Subscription Management**: Stripe integration for multi-tier subscriptions with webhook-based plan management.
+- **Subscription Management**: Stripe Checkout integration for multi-tier subscriptions with webhook-based plan management.
+  - **Payment Flow**: Stripe Checkout hosted payment page (supports Apple Pay, Google Pay, and all major payment methods)
+  - **Backend**: POST /api/create-checkout-session creates Checkout Sessions with userId and planTier metadata
+  - **Webhook**: checkout.session.completed event activates subscriptions automatically after payment
+  - **Success Page**: Polls /api/user endpoint until subscription activation is confirmed
+  - **Production Setup**: Requires trust proxy configuration, secure cookies (secure:true, sameSite:lax) for HTTPS domains
+  - **Webhook Events**: checkout.session.completed, invoice.paid, customer.subscription.updated, customer.subscription.deleted
 - **Image Processing**: `sharp` for image manipulation and `multer` for file uploads.
 - **Dynamic Redirects**: Short slugs for dynamic QR code URLs `/r/:slug`.
 
