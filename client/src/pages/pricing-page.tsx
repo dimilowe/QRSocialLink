@@ -76,11 +76,12 @@ export default function PricingPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data.success) {
+      if (data.success && data.message) {
         toast({
           title: "Already subscribed",
           description: data.message,
         });
+        setTimeout(() => setLocation("/dashboard"), 2000);
       } else if (data.url) {
         window.location.href = data.url;
       }
