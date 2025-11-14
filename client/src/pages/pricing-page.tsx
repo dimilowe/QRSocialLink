@@ -45,7 +45,7 @@ const plans = [
     cta: "Get Pro",
   },
   {
-    id: "enterprise",
+    id: "unlimited",
     name: "Unlimited",
     price: 99,
     icon: Building2,
