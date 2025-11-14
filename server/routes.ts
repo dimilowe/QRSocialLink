@@ -1080,11 +1080,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const planConfig = PLAN_PRICES[planTier as keyof typeof PLAN_PRICES];
 
       if (user.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(
-          user.stripeSubscriptionId
-        );
+        try {
+          const subscription = await stripe.subscriptions.retrieve(
+            user.stripeSubscriptionId
+          );
 
-        const currentPlanTier = subscription.metadata?.planTier;
+          const currentPlanTier = subscription.metadata?.planTier;
 
         if (currentPlanTier === planTier) {
           return res.send({
@@ -1137,6 +1138,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           subscriptionId: updatedSubscription.id,
           clientSecret: paymentIntent?.client_secret,
         });
+        } catch (subscriptionError: any) {
+          if (subscriptionError.message?.includes('test mode') || subscriptionError.message?.includes('live mode')) {
+            console.log(`Test/Live mode mismatch detected. Clearing old Stripe data for user ${user.id} and creating fresh subscription.`);
+            
+            const customer = await stripe.customers.create({
+              email: user.email,
+              name: user.username,
+            });
+            customerId = customer.id;
+          } else {
+            throw subscriptionError;
+          }
+        }
       }
 
       const price = await stripe.prices.create({
