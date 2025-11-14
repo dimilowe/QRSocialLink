@@ -10,6 +10,7 @@ import AuthPage from "@/pages/auth-page";
 import HomePage from "@/pages/home-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
+import SubscribeSuccessPage from "@/pages/subscribe-success-page";
 import PricingPage from "@/pages/pricing-page";
 import CreateQRPage from "@/pages/create-qr-page";
 import DashboardPage from "@/pages/dashboard-page";
@@ -59,6 +60,7 @@ function Router() {
         </Route>
         <Route path="/" component={HomePage} />
         <Route path="/pricing" component={PricingPage} />
+        <Route path="/subscribe/success" component={() => <ProtectedRoute component={SubscribeSuccessPage} />} />
         <Route path="/feedback" component={FeedbackPage} />
         <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
         <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />

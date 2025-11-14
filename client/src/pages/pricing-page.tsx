@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
@@ -6,12 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Crown, Building2, Check, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 const plans = [
   {
@@ -70,82 +65,29 @@ const plans = [
   },
 ];
 
-function CheckoutForm({ plan, onSuccess }: { plan: string; onSuccess: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast } = useToast();
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/dashboard`,
-      },
-    });
-
-    if (error) {
-      toast({
-        title: "Payment failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      onSuccess();
-    }
-
-    setIsProcessing(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full"
-        data-testid="button-confirm-payment"
-      >
-        {isProcessing ? "Processing..." : "Confirm Payment"}
-      </Button>
-    </form>
-  );
-}
-
 export default function PricingPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const createSubscription = useMutation({
+  const createCheckoutSession = useMutation({
     mutationFn: async (planTier: string) => {
-      const response = await apiRequest("POST", "/api/get-or-create-subscription", { planTier });
+      const response = await apiRequest("POST", "/api/create-checkout-session", { planTier });
       return response.json();
     },
     onSuccess: (data) => {
       if (data.success) {
         toast({
-          title: "Subscription updated!",
+          title: "Already subscribed",
           description: data.message,
         });
-        setLocation("/dashboard");
-      } else if (data.clientSecret) {
-        setClientSecret(data.clientSecret);
+      } else if (data.url) {
+        window.location.href = data.url;
       }
     },
     onError: (error: Error) => {
       toast({
-        title: "Subscription failed",
+        title: "Checkout failed",
         description: error.message,
         variant: "destructive",
       });
@@ -158,18 +100,7 @@ export default function PricingPage() {
       return;
     }
 
-    setSelectedPlan(planId);
-    createSubscription.mutate(planId);
-  };
-
-  const handlePaymentSuccess = () => {
-    toast({
-      title: "Payment successful!",
-      description: "Your subscription has been activated.",
-    });
-    setClientSecret(null);
-    setSelectedPlan(null);
-    setLocation("/dashboard");
+    createCheckoutSession.mutate(planId);
   };
 
   return (
@@ -239,10 +170,10 @@ export default function PricingPage() {
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
                   onClick={() => handleSelectPlan(plan.id)}
-                  disabled={createSubscription.isPending || isCurrentPlan}
+                  disabled={createCheckoutSession.isPending || isCurrentPlan}
                   data-testid={`button-subscribe-${plan.id}`}
                 >
-                  {createSubscription.isPending && selectedPlan === plan.id
+                  {createCheckoutSession.isPending
                     ? "Processing..."
                     : isCurrentPlan
                     ? "Current Plan"
@@ -252,15 +183,6 @@ export default function PricingPage() {
             );
           })}
         </div>
-
-        {clientSecret && selectedPlan && (
-          <Card className="max-w-md mx-auto p-6">
-            <h2 className="text-xl font-bold mb-4 font-heading">Complete Your Payment</h2>
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
-              <CheckoutForm plan={selectedPlan} onSuccess={handlePaymentSuccess} />
-            </Elements>
-          </Card>
-        )}
 
         <div className="max-w-3xl mx-auto mt-16">
           <h2 className="text-2xl font-bold mb-6 text-center font-heading">Frequently Asked Questions</h2>
@@ -280,7 +202,7 @@ export default function PricingPage() {
             <Card className="p-6">
               <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
               <p className="text-muted-foreground text-sm">
-                We accept all major credit cards through Stripe, our secure payment processor.
+                We accept all major credit cards, Apple Pay, Google Pay, and more through Stripe, our secure payment processor.
               </p>
             </Card>
           </div>
