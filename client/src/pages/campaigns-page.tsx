@@ -130,7 +130,7 @@ export default function CampaignsPage() {
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Strategy:</span>
                       <span className="font-medium">
-                        {campaign.abStrategy === "weighted_random" ? "Weighted Random" : "Epsilon Greedy"}
+                        {campaign.abStrategy === "weighted_random" ? "Manual Split" : "Auto-Optimize"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-primary">
@@ -182,17 +182,17 @@ export default function CampaignsPage() {
                 <SelectContent>
                   <SelectItem value="weighted_random">
                     <div>
-                      <div className="font-medium">Weighted Random</div>
+                      <div className="font-medium">Manual Split</div>
                       <div className="text-xs text-muted-foreground">
-                        Distribute traffic based on configured weights
+                        You control how traffic is divided between destinations
                       </div>
                     </div>
                   </SelectItem>
                   <SelectItem value="epsilon_greedy">
                     <div>
-                      <div className="font-medium">Epsilon Greedy (Auto-optimize)</div>
+                      <div className="font-medium">Auto-Optimize</div>
                       <div className="text-xs text-muted-foreground">
-                        Automatically optimize for highest conversion rate
+                        AI learns and sends more traffic to better-performing destinations
                       </div>
                     </div>
                   </SelectItem>

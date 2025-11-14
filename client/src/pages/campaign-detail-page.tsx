@@ -138,7 +138,7 @@ export default function CampaignDetailPage() {
               {campaign.name}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {campaign.abStrategy === "weighted_random" ? "Weighted Random" : "Epsilon Greedy"} Strategy
+              {campaign.abStrategy === "weighted_random" ? "Manual Split" : "Auto-Optimize"} Strategy
             </p>
           </div>
           <Badge variant={campaign.status === "active" ? "default" : "secondary"}>
