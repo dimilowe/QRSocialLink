@@ -31,9 +31,9 @@ const PLAN_PRICES = {
     amount: 3000, // $30
     name: "QR Social Pro",
   },
-  enterprise: {
+  unlimited: {
     amount: 9900, // $99
-    name: "QR Social Enterprise",
+    name: "QR Social Unlimited",
   },
 } as const;
 
@@ -1073,8 +1073,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = req.user;
     const { planTier } = req.body;
 
-    if (!planTier || !["starter", "pro", "enterprise"].includes(planTier)) {
-      return res.status(400).send({ error: { message: "Invalid plan tier" } });
+    if (!planTier || !["starter", "pro", "unlimited"].includes(planTier)) {
+      return res.status(400).json({ error: "Invalid plan tier" });
     }
 
     if (!user.email) {
@@ -1105,7 +1105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentPlanTier = subscription.metadata?.planTier;
 
           if (currentPlanTier === planTier) {
-            return res.send({
+            return res.json({
               success: true,
               message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
             });
@@ -1156,13 +1156,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      res.send({
+      res.json({
         sessionId: session.id,
         url: session.url,
       });
     } catch (error: any) {
       console.error('Checkout session error:', error);
-      return res.status(400).send({ error: { message: error.message } });
+      return res.status(400).json({ error: error.message });
     }
   });
 
