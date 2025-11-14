@@ -1129,7 +1129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const baseUrl = process.env.NODE_ENV === 'production' 
         ? 'https://qrsocial.studio'
-        : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        : `${req.protocol}://${req.get('host')}`;
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
