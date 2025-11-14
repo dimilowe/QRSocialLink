@@ -37,6 +37,7 @@ declare global {
 export function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
   const isProduction = process.env.NODE_ENV === "production";
+  const isReplitDev = process.env.REPL_SLUG !== undefined;
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "qr-social-secret-key-change-in-production",
@@ -45,8 +46,8 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7,
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? "lax" : "lax",
+      secure: isProduction || isReplitDev,
+      sameSite: "lax",
     },
     store: new PgStore({
       pool: pool,
