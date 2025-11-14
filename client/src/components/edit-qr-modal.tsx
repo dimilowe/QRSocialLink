@@ -13,13 +13,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Square, Circle, Star, Heart, Diamond, Camera, Download, Upload, X } from "lucide-react";
 import { Scan } from "@shared/schema";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/lib/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface EditQRModalProps {
   scan: Scan | null;
@@ -48,13 +49,20 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [originalScan, setOriginalScan] = useState<Scan | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [enableABTesting, setEnableABTesting] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   
   const isFreeUser = user?.plan === 'free';
+
+  const { data: campaigns } = useQuery<any[]>({
+    queryKey: ["/api/campaigns"],
+    enabled: !!user && enableABTesting && open,
+  });
 
   useEffect(() => {
     if (scan && open) {
       setOriginalScan(scan);
-      setUrl(scan.redirectUrl || scan.decodedUrl);
+      setUrl((scan as any).destination || scan.redirectUrl || scan.decodedUrl);
       setTitle(scan.title || "");
       setForegroundColor(scan.foregroundColor || "#000000");
       setBackgroundColor(scan.backgroundColor || "#FFFFFF");
@@ -69,6 +77,8 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       setCanvasFillEnabled((scan as any).canvasFillEnabled || false);
       setCanvasFillColor((scan as any).canvasFillColor || "#FFFFFF");
       setQrPreviewUrl(scan.qrImageUrl || "");
+      setEnableABTesting(!!scan.campaignId);
+      setSelectedCampaignId(scan.campaignId || "");
     }
   }, [scan, open]);
 
@@ -436,27 +446,50 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     e.preventDefault();
     if (!scan || !originalScan) return;
 
-    try {
-      const parsedUrl = new URL(url.trim());
-      
-      if (isFreeUser) {
-        const updates: any = {};
-        const normalizeValue = (val: any) => val || null;
-        
-        if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
-          updates.title = title.trim() || null;
-        }
-        
-        updateMutation.mutate(updates);
+    if (enableABTesting && !selectedCampaignId) {
+      toast({
+        title: "Campaign Required",
+        description: "Please select a campaign for A/B testing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!enableABTesting) {
+      try {
+        new URL(url.trim());
+      } catch {
+        toast({
+          title: "Invalid URL",
+          description: "Please enter a valid destination URL",
+          variant: "destructive",
+        });
         return;
       }
+    }
       
+    if (isFreeUser) {
       const updates: any = {};
       const normalizeValue = (val: any) => val || null;
       
-      const newRedirectUrl = url.trim() !== originalScan.decodedUrl ? url.trim() : null;
-      if (normalizeValue(newRedirectUrl) !== normalizeValue(originalScan.redirectUrl)) {
-        updates.redirectUrl = newRedirectUrl;
+      if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
+        updates.title = title.trim() || null;
+      }
+      
+      updateMutation.mutate(updates);
+      return;
+    }
+    
+    const updates: any = {};
+    const normalizeValue = (val: any) => val || null;
+      
+      if (enableABTesting) {
+        updates.destination = null;
+        updates.redirectUrl = null;
+        updates.campaignId = selectedCampaignId;
+      } else {
+        updates.destination = url.trim();
+        updates.campaignId = null;
       }
       
       if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
@@ -515,13 +548,6 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       }
       
       updateMutation.mutate(updates);
-    } catch {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid URL",
-        variant: "destructive",
-      });
-    }
   };
 
   const shapeButtons = [
@@ -580,6 +606,50 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                   data-testid="input-title"
                 />
               </div>
+
+              {!isFreeUser && (
+                <>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Enable A/B Testing</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Track multiple destinations and optimize conversions
+                      </p>
+                    </div>
+                    <Switch
+                      checked={enableABTesting}
+                      onCheckedChange={setEnableABTesting}
+                      data-testid="switch-ab-testing-edit"
+                    />
+                  </div>
+
+                  {enableABTesting && (
+                    <div className="space-y-2">
+                      <Label>Campaign *</Label>
+                      <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+                        <SelectTrigger data-testid="select-campaign-edit">
+                          <SelectValue placeholder="Select a campaign" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {campaigns?.map((campaign: any) => (
+                            <SelectItem key={campaign.id} value={campaign.id}>
+                              {campaign.name}
+                            </SelectItem>
+                          ))}
+                          {(!campaigns || campaigns.length === 0) && (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No campaigns found. Create one first.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Select a campaign with multiple destinations for A/B testing
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

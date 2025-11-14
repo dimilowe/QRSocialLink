@@ -677,7 +677,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
       }
 
-      const destinationUrl = scan.redirectUrl || scan.decodedUrl;
+      let destinationUrl: string;
+      let selectedDestinationId: string | null = null;
+      
+      if (scan.campaignId) {
+        const campaign = await storage.getCampaign(scan.campaignId);
+        if (campaign) {
+          const destinations = await storage.getCampaignDestinations(scan.campaignId);
+          if (destinations && destinations.length > 0) {
+            const strategy = createABStrategy(campaign.abStrategy);
+            const selectedDestination = strategy.selectDestination(destinations);
+            destinationUrl = selectedDestination.url;
+            selectedDestinationId = selectedDestination.id;
+            await storage.incrementDestinationImpressions(selectedDestination.id);
+          } else {
+            destinationUrl = scan.destination || scan.redirectUrl || scan.decodedUrl;
+          }
+        } else {
+          destinationUrl = scan.destination || scan.redirectUrl || scan.decodedUrl;
+        }
+      } else {
+        destinationUrl = scan.destination || scan.redirectUrl || scan.decodedUrl;
+      }
       
       if (!destinationUrl) {
         return res.status(500).send(`
@@ -747,7 +768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.createScanEvent({
         campaignId: scan.campaignId || null,
-        destinationId: null,
+        destinationId: selectedDestinationId,
         frameId: null,
         scanId: scan.id,
         userAgent: userAgentString || null,
@@ -764,6 +785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.redirect(302, destinationUrl);
     } catch (error: any) {
+      console.error('[QR Redirect Error]:', error.message);
       res.status(500).send(`
         <!DOCTYPE html>
         <html>
@@ -785,7 +807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               <p><a href="/">Visit QR Social</a></p>
             </div>
           </body>
-        </html>
+          </html>
       `);
     }
   });

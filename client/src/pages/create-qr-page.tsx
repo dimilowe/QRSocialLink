@@ -22,6 +22,8 @@ import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon, Square,
 import { insertScanSchema } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useQuery } from "@tanstack/react-query";
 
 const createQRFormSchema = insertScanSchema
   .pick({ decodedUrl: true, title: true })
@@ -55,6 +57,8 @@ export default function CreateQRPage() {
   const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
   const [giflerInstance, setGiflerInstance] = useState<any>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [enableABTesting, setEnableABTesting] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
 
   const form = useForm<CreateQRFormData>({
     resolver: zodResolver(createQRFormSchema),
@@ -65,6 +69,11 @@ export default function CreateQRPage() {
   });
 
   const url = form.watch("decodedUrl");
+
+  const { data: campaigns } = useQuery<any[]>({
+    queryKey: ["/api/campaigns"],
+    enabled: !!user && enableABTesting,
+  });
 
   const handleBackgroundImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -503,6 +512,8 @@ export default function CreateQRPage() {
         title: data.title || undefined,
         type: "created",
         isPublic: true,
+        destination: enableABTesting ? null : data.decodedUrl,
+        campaignId: enableABTesting ? selectedCampaignId : null,
         topText: enableBranding ? topText : null,
         bottomText: enableBranding ? bottomText : null,
         borderColor: enableBranding ? borderColor : null,
@@ -600,6 +611,14 @@ export default function CreateQRPage() {
       toast({
         title: "Login required",
         description: "Please log in to create QR codes",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (enableABTesting && !selectedCampaignId) {
+      toast({
+        title: "Campaign Required",
+        description: "Please select a campaign for A/B testing",
         variant: "destructive",
       });
       return;
@@ -749,6 +768,46 @@ export default function CreateQRPage() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Enable A/B Testing</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Track multiple destinations and optimize conversions
+                      </p>
+                    </div>
+                    <Switch
+                      checked={enableABTesting}
+                      onCheckedChange={setEnableABTesting}
+                      data-testid="switch-ab-testing"
+                    />
+                  </div>
+
+                  {enableABTesting && (
+                    <div className="space-y-2">
+                      <FormLabel>Campaign *</FormLabel>
+                      <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+                        <SelectTrigger data-testid="select-campaign">
+                          <SelectValue placeholder="Select a campaign" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {campaigns?.map((campaign: any) => (
+                            <SelectItem key={campaign.id} value={campaign.id}>
+                              {campaign.name}
+                            </SelectItem>
+                          ))}
+                          {(!campaigns || campaigns.length === 0) && (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No campaigns found. Create one first.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Select a campaign with multiple destinations for A/B testing
+                      </p>
+                    </div>
+                  )}
 
                   <Tabs defaultValue="qr" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">

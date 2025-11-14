@@ -70,7 +70,16 @@ This configuration has been battle-tested and resolves SSL certificate issues th
 - **QR Code Management**: Custom branded QR code creation with color customization, background images (static and animated GIFs), image fit modes (cover/contain/stretch), real-time preview with animated GIF playback, download as PNG/GIF (animated), storage, and history. Editable destinations for paid plans.
   - **Scan Tracking**: Individual QR codes use `/q/:slug` tracking URLs (generated with nanoid). After saving, QR codes are automatically regenerated with tracking URLs while preserving all custom branding (shapes, colors, GIFs, text, watermarks). The `generateBrandedQR()` function is fully self-contained and reusable across preview and tracking regeneration flows.
 - **Subscription Model**: Preview-only free access + 3 paid tiers (Starter $10/mo, Pro $30/mo, Unlimited $99/mo). Free users can build and preview QR codes but cannot save or download. Feature-based limits (canSave, canDownload) enforced by the backend, integrated with Stripe checkout and dynamic updates via webhooks.
-- **Campaigns & A/B Testing**: CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
+- **Campaigns & A/B Testing**: 
+  - **Toggle-Based QR Modes**: QR codes can operate in two modes via a toggle in both create and edit interfaces:
+    - **Simple Mode** (default): Direct URL tracking with `destination` field for straightforward redirects
+    - **A/B Testing Mode**: Campaign-based multi-variant testing with weighted distribution
+  - **Mode Switching**: Edit modal supports converting between simple and A/B modes. When enabling A/B testing, the system clears `destination` AND `redirectUrl` to ensure clean campaign routing. When disabling A/B testing, the user must specify a destination URL.
+  - **Backend Redirect Logic**: `/q/:slug` endpoint implements campaign-aware routing:
+    - Priority order: campaign destinations (if `campaignId` set) → `destination` → `redirectUrl` → `decodedUrl`
+    - Uses campaign's configured AB strategy (`epsilon_greedy` or `weighted_random`)
+    - Tracks `destinationId` in scan events and increments destination impressions
+  - CRUD operations for campaigns, creation of A/B test variants (destinations) with weight configuration, impression, and conversion tracking.
 - **Advanced Analytics**: 
   - **Campaign Analytics**: Comprehensive tracking for campaigns including device types, social media sources, OS/browser breakdown, and time-series data.
   - **Individual QR Analytics**: Each QR code displays real-time scan metrics on the dashboard including total scans, top traffic platform, device breakdown, OS data, and time-series trends via `/api/scans/:scanId/analytics` endpoint.

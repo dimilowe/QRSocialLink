@@ -66,6 +66,7 @@ export const scans = pgTable("scans", {
   qrImageUrl: text("qr_image_url").notNull(),
   decodedUrl: text("decoded_url").notNull(),
   redirectUrl: text("redirect_url"),
+  destination: text("destination"),
   dynamicSlug: text("dynamic_slug"),
   title: text("title"),
   type: text("type").notNull().default("scanned"),
@@ -212,6 +213,12 @@ export const feedback = pgTable("feedback", {
   message: text("message").notNull(),
   email: text("email").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
