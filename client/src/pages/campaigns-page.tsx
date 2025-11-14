@@ -19,10 +19,8 @@ export default function CampaignsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newCampaign, setNewCampaign] = useState<{
     name: string;
-    abStrategy: "weighted_random" | "epsilon_greedy";
   }>({
     name: "",
-    abStrategy: "weighted_random",
   });
 
   const { data: campaigns = [], isLoading } = useQuery<Campaign[]>({
@@ -31,16 +29,19 @@ export default function CampaignsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof newCampaign) => {
-      const response = await apiRequest("POST", "/api/campaigns", data);
+      const response = await apiRequest("POST", "/api/campaigns", {
+        ...data,
+        abStrategy: "weighted_random"
+      });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       setShowCreateDialog(false);
-      setNewCampaign({ name: "", abStrategy: "weighted_random" });
+      setNewCampaign({ name: "" });
       toast({
         title: "Campaign created!",
-        description: "Your A/B testing campaign has been created",
+        description: "Your split testing campaign has been created",
       });
     },
     onError: (error: any) => {
@@ -73,7 +74,7 @@ export default function CampaignsPage() {
               Campaigns
             </h1>
             <p className="text-sm text-muted-foreground">
-              Create and manage A/B testing campaigns for your QR codes
+              Create split testing campaigns to compare multiple destinations
             </p>
           </div>
           
@@ -99,7 +100,7 @@ export default function CampaignsPage() {
               <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="font-heading font-semibold text-lg mb-2">No campaigns yet</h3>
               <p className="text-muted-foreground text-center mb-6 max-w-sm">
-                Create your first campaign to start A/B testing different destinations and tracking conversion metrics.
+                Create your first campaign to split test different destinations and track your analytics.
               </p>
               <Button onClick={() => setShowCreateDialog(true)} data-testid="button-create-first-campaign">
                 <Plus className="h-4 w-4 mr-2" />
@@ -126,13 +127,6 @@ export default function CampaignsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Strategy:</span>
-                      <span className="font-medium">
-                        {campaign.abStrategy === "weighted_random" ? "Manual Split" : "Auto-Optimize"}
-                      </span>
-                    </div>
                     <div className="flex items-center gap-2 text-sm text-primary">
                       <ExternalLink className="h-4 w-4" />
                       <span className="font-mono text-xs truncate">
@@ -152,7 +146,7 @@ export default function CampaignsPage() {
           <DialogHeader>
             <DialogTitle>Create Campaign</DialogTitle>
             <DialogDescription>
-              Set up a new A/B testing campaign to optimize your QR code destinations
+              Split test multiple destinations and compare results using your own analytics
             </DialogDescription>
           </DialogHeader>
           
@@ -166,38 +160,9 @@ export default function CampaignsPage() {
                 onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
                 data-testid="input-campaign-name"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ab-strategy">A/B Testing Strategy</Label>
-              <Select
-                value={newCampaign.abStrategy}
-                onValueChange={(value: "weighted_random" | "epsilon_greedy") =>
-                  setNewCampaign({ ...newCampaign, abStrategy: value })
-                }
-              >
-                <SelectTrigger id="ab-strategy" data-testid="select-ab-strategy">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weighted_random">
-                    <div>
-                      <div className="font-medium">Manual Split</div>
-                      <div className="text-xs text-muted-foreground">
-                        You control how traffic is divided between destinations
-                      </div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="epsilon_greedy">
-                    <div>
-                      <div className="font-medium">Auto-Optimize</div>
-                      <div className="text-xs text-muted-foreground">
-                        AI learns and sends more traffic to better-performing destinations
-                      </div>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="text-xs text-muted-foreground">
+                After creating the campaign, add destinations and set traffic weights to split test different URLs
+              </p>
             </div>
           </div>
 

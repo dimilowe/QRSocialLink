@@ -357,6 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         userId: req.user.id,
         slug,
+        abStrategy: "weighted_random",
       });
       const campaign = await storage.createCampaign(validatedData);
       res.json(campaign);

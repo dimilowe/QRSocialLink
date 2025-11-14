@@ -618,7 +618,7 @@ export default function CreateQRPage() {
     if (enableABTesting && !selectedCampaignId) {
       toast({
         title: "Campaign Required",
-        description: "Please select a campaign for A/B testing",
+        description: "Please select a campaign for split testing",
         variant: "destructive",
       });
       return;
@@ -771,9 +771,9 @@ export default function CreateQRPage() {
 
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Enable A/B Testing</FormLabel>
+                      <FormLabel className="text-base">Enable Split Testing</FormLabel>
                       <p className="text-sm text-muted-foreground">
-                        Track multiple destinations and optimize conversions
+                        Route traffic to multiple campaign destinations
                       </p>
                     </div>
                     <Switch
@@ -804,7 +804,7 @@ export default function CreateQRPage() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Select a campaign with multiple destinations for A/B testing
+                        Select a campaign with multiple destinations for split testing
                       </p>
                     </div>
                   )}

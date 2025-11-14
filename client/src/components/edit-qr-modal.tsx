@@ -48,39 +48,87 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [canvasFillColor, setCanvasFillColor] = useState("#FFFFFF");
   const [originalScan, setOriginalScan] = useState<Scan | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initializedScanId = useRef<string | null>(null);
   const { toast } = useToast();
   const [enableABTesting, setEnableABTesting] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [savedSimpleUrl, setSavedSimpleUrl] = useState<string>("");
   
   const isFreeUser = user?.plan === 'free';
 
   const { data: campaigns } = useQuery<any[]>({
     queryKey: ["/api/campaigns"],
-    enabled: !!user && enableABTesting && open,
+    enabled: !!user && open,
+  });
+
+  const campaignIdForDestinations = selectedCampaignId || scan?.campaignId;
+  
+  const { data: campaignDestinations } = useQuery<any[]>({
+    queryKey: ["/api/campaigns", campaignIdForDestinations, "destinations"],
+    enabled: !!campaignIdForDestinations && open,
   });
 
   useEffect(() => {
     if (scan && open) {
-      setOriginalScan(scan);
-      setUrl((scan as any).destination || scan.redirectUrl || scan.decodedUrl);
-      setTitle(scan.title || "");
-      setForegroundColor(scan.foregroundColor || "#000000");
-      setBackgroundColor(scan.backgroundColor || "#FFFFFF");
-      setBorderColor(scan.borderColor || "#8B5CF6");
-      setEnableBranding(scan.enableBranding || false);
-      setTopText(scan.topText || "qrsocial.com");
-      setBottomText(scan.bottomText || "Screenshot & Long-press");
-      setBackgroundImage(scan.backgroundImage || null);
-      setBorderShape((scan.borderShape as any) || "square");
-      setImageFit((scan.imageFitMode as any) || "cover");
-      setPolaroidText(scan.polaroidText || "");
-      setCanvasFillEnabled((scan as any).canvasFillEnabled || false);
-      setCanvasFillColor((scan as any).canvasFillColor || "#FFFFFF");
-      setQrPreviewUrl(scan.qrImageUrl || "");
-      setEnableABTesting(!!scan.campaignId);
-      setSelectedCampaignId(scan.campaignId || "");
+      const needsReinit = initializedScanId.current !== scan.id;
+      
+      if (needsReinit) {
+        initializedScanId.current = scan.id;
+        setOriginalScan(scan);
+        
+        let initialUrl = "";
+        if ((scan as any).destination) {
+          initialUrl = (scan as any).destination;
+        } else if (scan.redirectUrl) {
+          initialUrl = scan.redirectUrl;
+        } else if (scan.decodedUrl) {
+          initialUrl = scan.decodedUrl;
+        } else {
+          initialUrl = "";
+        }
+        
+        setUrl(initialUrl);
+        setTitle(scan.title || "");
+        setForegroundColor(scan.foregroundColor || "#000000");
+        setBackgroundColor(scan.backgroundColor || "#FFFFFF");
+        setBorderColor(scan.borderColor || "#8B5CF6");
+        setEnableBranding(scan.enableBranding || false);
+        setTopText(scan.topText || "qrsocial.com");
+        setBottomText(scan.bottomText || "Screenshot & Long-press");
+        setBackgroundImage(scan.backgroundImage || null);
+        setBorderShape((scan.borderShape as any) || "square");
+        setImageFit((scan.imageFitMode as any) || "cover");
+        setPolaroidText(scan.polaroidText || "");
+        setCanvasFillEnabled((scan as any).canvasFillEnabled || false);
+        setCanvasFillColor((scan as any).canvasFillColor || "#FFFFFF");
+        setQrPreviewUrl(scan.qrImageUrl || "");
+        setEnableABTesting(!!scan.campaignId);
+        setSelectedCampaignId(scan.campaignId || "");
+      }
+    } else {
+      initializedScanId.current = null;
     }
   }, [scan, open]);
+
+  useEffect(() => {
+    if (scan?.campaignId && campaignDestinations && campaignDestinations.length > 0 && !url) {
+      const highestWeightDest = campaignDestinations.reduce((max, dest) => 
+        dest.weight > max.weight ? dest : max
+      , campaignDestinations[0]);
+      setUrl(highestWeightDest.url);
+    }
+  }, [scan?.campaignId, campaignDestinations, url]);
+
+  useEffect(() => {
+    if (enableABTesting && selectedCampaignId && campaignDestinations && campaignDestinations.length > 0) {
+      const highestWeightDest = campaignDestinations.reduce((max, dest) => 
+        dest.weight > max.weight ? dest : max
+      , campaignDestinations[0]);
+      setUrl(highestWeightDest.url);
+    } else if (enableABTesting && selectedCampaignId && (!campaignDestinations || campaignDestinations.length === 0)) {
+      setUrl("");
+    }
+  }, [enableABTesting, selectedCampaignId, campaignDestinations]);
 
   // QR Preview Generation
   useEffect(() => {
@@ -449,7 +497,16 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     if (enableABTesting && !selectedCampaignId) {
       toast({
         title: "Campaign Required",
-        description: "Please select a campaign for A/B testing",
+        description: "Please select a campaign for split testing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (enableABTesting && !url) {
+      toast({
+        title: "No Destinations",
+        description: "This campaign has no destinations. Add destinations to the campaign first.",
         variant: "destructive",
       });
       return;
@@ -592,7 +649,18 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                   onChange={(e) => setUrl(e.target.value)}
                   required
                   data-testid="input-url"
+                  disabled={enableABTesting}
                 />
+                {enableABTesting && !url && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                    This campaign has no destinations yet. Add destinations to the campaign first, then edit this QR.
+                  </p>
+                )}
+                {enableABTesting && url && (
+                  <p className="text-xs text-muted-foreground">
+                    Auto-filled from campaign's highest-weight destination. Toggle off split testing to edit manually.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -611,14 +679,21 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                 <>
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="space-y-0.5">
-                      <Label className="text-base">Enable A/B Testing</Label>
+                      <Label className="text-base">Enable Split Testing</Label>
                       <p className="text-sm text-muted-foreground">
-                        Track multiple destinations and optimize conversions
+                        Route traffic to multiple campaign destinations
                       </p>
                     </div>
                     <Switch
                       checked={enableABTesting}
-                      onCheckedChange={setEnableABTesting}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSavedSimpleUrl(url);
+                        } else {
+                          setUrl(savedSimpleUrl || url);
+                        }
+                        setEnableABTesting(checked);
+                      }}
                       data-testid="switch-ab-testing-edit"
                     />
                   </div>
@@ -644,7 +719,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Select a campaign with multiple destinations for A/B testing
+                        Select a campaign with multiple destinations for split testing
                       </p>
                     </div>
                   )}

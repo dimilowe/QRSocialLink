@@ -55,7 +55,7 @@ export default function CampaignDetailPage() {
       setNewDestination({ name: "", url: "", weight: 50 });
       toast({
         title: "Destination added!",
-        description: "Your A/B test variant has been added",
+        description: "Your split test destination has been added",
       });
     },
   });
@@ -69,7 +69,7 @@ export default function CampaignDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId] });
       toast({
         title: "Destination removed",
-        description: "The A/B test variant has been removed",
+        description: "The split test destination has been removed",
       });
     },
   });
@@ -138,7 +138,7 @@ export default function CampaignDetailPage() {
               {campaign.name}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {campaign.abStrategy === "weighted_random" ? "Manual Split" : "Auto-Optimize"} Strategy
+              Split Testing Campaign
             </p>
           </div>
           <Badge variant={campaign.status === "active" ? "default" : "secondary"}>
@@ -149,7 +149,7 @@ export default function CampaignDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Dynamic Redirect URL</CardTitle>
-            <CardDescription>Use this URL in your QR code for A/B testing</CardDescription>
+            <CardDescription>Use this URL in your QR code to split test multiple destinations</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {destinations.length === 0 && (
@@ -213,8 +213,8 @@ export default function CampaignDetailPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>A/B Test Variants</CardTitle>
-                <CardDescription>Manage destination URLs and view performance</CardDescription>
+                <CardTitle>Destinations</CardTitle>
+                <CardDescription>Add destinations with traffic weights. Check each destination's analytics to compare performance.</CardDescription>
               </div>
               <Button onClick={() => setShowAddDestination(true)} size="sm" data-testid="button-add-destination">
                 <Plus className="h-4 w-4 mr-2" />
@@ -225,7 +225,7 @@ export default function CampaignDetailPage() {
           <CardContent>
             {campaign.destinations.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No destinations yet. Add your first A/B test variant.</p>
+                <p className="text-muted-foreground mb-4">No destinations yet. Add your first split test destination.</p>
                 <Button onClick={() => setShowAddDestination(true)} variant="outline" size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Destination
