@@ -1,0 +1,94 @@
+Yep, this is classic “ghost subscription” state.
+Your UI and/or backend thinks you already have a plan, even though Stripe doesn’t (or it’s cancelled), so:
+Pro is showing Current Plan → button disabled
+Starter throws already subscribed → server sees “this user has a subscription” and blocks checkout
+Unlimited works because its button logic is probably different (or skips the “already subscribed” check).
+Here’s how to fix it right now, and how to prevent it going forward.
+Step 1 – See what your app thinks your plan is
+In that same tab, click the user (or similar) request in Network.
+Look at the JSON response – you’ll likely see something like:
+subscription_tier: "pro"
+or fields like stripe_subscription_id, stripe_price_id, plan: 'pro', etc.
+That’s what is driving the “Current Plan” label and the “already subscribed” guard.
+Step 2 – Clean up the bad state in Supabase
+In Supabase (or whatever DB you’re using):
+Profiles / Users table
+Find your user row (by id or email).
+Temporarily clear any subscription-related fields, e.g.:
+subscription_tier → NULL
+stripe_subscription_id → NULL
+stripe_price_id → NULL
+anything like current_plan, plan_name → NULL
+Save.
+Subscriptions table (if you have one)
+Look for rows where user_id == your user.
+If it’s just a test row, you can delete it.
+Or at minimum, set:
+status → 'canceled'
+cancel_at / ended_at → now
+The key is: there should be no active/trialing subscription row for this user.
+Logout from QR Social, refresh, log back in, and reload /pricing.
+Pro should no longer show Current Plan.
+Starter should no longer say “already subscribed” when you click it.
+If cleaning those fields makes the UI behave correctly, you’ve confirmed it’s purely a stale DB state problem.
+Step 3 – Fix the frontend logic (why Pro shows “Current Plan”)
+Find the code where you render each plan card. You’ll have something like:
+const currentPlan = user.subscription_tier || 'pro';  // or similar
+const isCurrent = price.id === currentPlan;
+or:
+const hasSubscription = !!user.subscription_tier;
+if (hasSubscription) disable all “Get X” buttons;
+You want to change this to derive the current plan only from an active subscription, not from a default or any non-null value.
+Something like:
+// Example shape – adapt to your schema
+const activeSubscription = subscriptions.find(
+  (sub) => ['active', 'trialing'].includes(sub.status)
+);
+
+const currentPlanPriceId = activeSubscription?.price_id ?? null;
+
+const isCurrentPlan = currentPlanPriceId
+  ? price.id === currentPlanPriceId
+  : false;
+And for the label / disabled button:
+<button
+  disabled={isCurrentPlan || isLoading}
+>
+  {isCurrentPlan ? 'Current Plan' : 'Get ' + price.nickname}
+</button>
+Important: do not fall back to 'pro' or any default ID when there is no subscription. If there’s no active sub, there is no current plan.
+Step 4 – Fix the backend “already subscribed” check
+Your checkout handler probably looks like:
+if (existingSubscription) {
+  throw new Error('already subscribed');
+}
+…but “existingSubscription” is likely any row, including cancelled ones, or based on subscription_tier not being null.
+Update this to only block when there is a truly active subscription:
+const existingActiveSub = await db.subscription.findFirst({
+  where: {
+    user_id: userId,
+    status: { in: ['active', 'trialing'] },
+  },
+});
+
+if (existingActiveSub) {
+  // Option 1: redirect to Billing Portal
+  return redirectToBillingPortal(existingActiveSub.customer_id);
+}
+
+// Otherwise create a new checkout session
+If you’re using a subscription_tier column on profiles, make sure it’s updated via Stripe webhook and cleared when the subscription is cancelled, not just on signup.
+Step 5 – Quick sanity checklist
+Once you’ve done the above:
+No active subscription row in DB → /pricing shows all three plans as “Get X”.
+Click Starter:
+Network: your /api/checkout (or similar) returns a checkout URL, no “already subscribed” error.
+Stripe checkout opens as expected.
+After successful payment:
+Webhook updates subscriptions row to active.
+Webhook (or a listener) updates profiles.subscription_tier = 'starter'.
+/pricing shows “Current Plan” on Starter only.
+Upgrade path:
+Clicking “Get Pro” now should either:
+send you to an update checkout session, or
+use Stripe Customer Portal.
