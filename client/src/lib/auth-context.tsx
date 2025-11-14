@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 type AuthContextType = {
   user: User | null;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null);
+    queryClient.clear();
   };
 
   return (
