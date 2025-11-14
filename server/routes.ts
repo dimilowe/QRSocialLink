@@ -1073,6 +1073,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = req.user;
     const { planTier } = req.body;
 
+    console.log(`[Checkout] User ${user.id} (${user.email}) requesting ${planTier} plan. Current plan: ${user.plan}, Stripe Sub: ${user.stripeSubscriptionId}`);
+
     if (!planTier || !["starter", "pro", "unlimited"].includes(planTier)) {
       return res.status(400).json({ error: "Invalid plan tier" });
     }
@@ -1094,28 +1096,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         customerId = customer.id;
         await storage.updateUserStripeInfo(user.id, customerId, null);
+        console.log(`[Checkout] Created new Stripe customer: ${customerId}`);
       }
 
       if (user.stripeSubscriptionId) {
+        console.log(`[Checkout] User has existing subscription ID: ${user.stripeSubscriptionId}`);
         try {
           const subscription = await stripe.subscriptions.retrieve(
             user.stripeSubscriptionId
           );
 
           const currentPlanTier = subscription.metadata?.planTier;
+          console.log(`[Checkout] Retrieved subscription. Plan tier: ${currentPlanTier}, Status: ${subscription.status}`);
 
           if (currentPlanTier === planTier) {
+            console.log(`[Checkout] User already has ${planTier} plan. Returning early.`);
             return res.json({
               success: true,
               message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
             });
           }
         } catch (subscriptionError: any) {
+          console.log(`[Checkout] Error retrieving subscription: ${subscriptionError.message}`);
           if (subscriptionError.message?.includes('test mode') || subscriptionError.message?.includes('live mode')) {
             console.log(`Test/Live mode mismatch detected. Clearing old Stripe data for user ${user.id}.`);
             await storage.updateUserStripeInfo(user.id, customerId, null);
           }
         }
+      } else {
+        console.log(`[Checkout] No existing subscription for user ${user.id}`);
       }
 
       const baseUrl = process.env.NODE_ENV === 'production' 
