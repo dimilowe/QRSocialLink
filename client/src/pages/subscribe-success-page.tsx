@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 export default function SubscribeSuccessPage() {
   const [, setLocation] = useLocation();
@@ -13,6 +14,8 @@ export default function SubscribeSuccessPage() {
     const params = new URLSearchParams(window.location.search);
     const session = params.get('session_id');
     setSessionId(session);
+    
+    queryClient.invalidateQueries({ queryKey: ['/api/user'] });
   }, []);
 
   const { data: user, isLoading } = useQuery({
