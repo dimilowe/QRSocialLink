@@ -38,6 +38,7 @@ export function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
   const isProduction = process.env.NODE_ENV === "production";
   const isReplitDev = process.env.REPL_SLUG !== undefined;
+  const isSecure = isProduction || isReplitDev || process.env.REPLIT_DEPLOYMENT === "1";
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "qr-social-secret-key-change-in-production",
@@ -46,7 +47,7 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7,
       httpOnly: true,
-      secure: isProduction || isReplitDev,
+      secure: isSecure,
       sameSite: "lax",
     },
     store: new PgStore({
@@ -54,6 +55,10 @@ export function setupAuth(app: Express) {
       createTableIfMissing: true,
     }),
   };
+  
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[Auth] Session config - secure: ${isSecure}, sameSite: lax, isReplitDev: ${isReplitDev}`);
+  }
 
   app.use(session(sessionSettings));
   app.use(passport.initialize());
