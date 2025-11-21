@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { setupAuth } from "./auth";
 import { OverlayProcessor } from "./overlay-processor";
 import { storage } from "./storage";
+import { runMigrations } from "./migrate";
 
 const app = express();
 
@@ -46,6 +47,8 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runMigrations();
+
   const overlayProcessor = new OverlayProcessor(storage);
   app.locals.overlayProcessor = overlayProcessor;
 
