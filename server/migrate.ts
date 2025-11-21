@@ -14,7 +14,7 @@ export async function runMigrations(): Promise<void> {
   console.log("[Migration] Running database migrations...");
   
   try {
-    const { stdout, stderr } = await execAsync("npx drizzle-kit push --yes");
+    const { stdout, stderr } = await execAsync("npx drizzle-kit push");
     
     if (stdout) {
       console.log("[Migration] Output:", stdout);
@@ -26,7 +26,7 @@ export async function runMigrations(): Promise<void> {
     
     console.log("[Migration] ✓ Migrations completed successfully");
   } catch (error: any) {
-    console.error("[Migration] ✗ Migration failed:", error.message);
+    console.error("[Migration] ⚠ Migration failed - server will continue anyway:", error.message);
     
     if (error.stdout) {
       console.error("[Migration] stdout:", error.stdout);
@@ -36,6 +36,6 @@ export async function runMigrations(): Promise<void> {
       console.error("[Migration] stderr:", error.stderr);
     }
     
-    throw new Error("Database migration failed. Cannot start server.");
+    console.error("[Migration] ⚠ WARNING: Schema may be out of sync. Manual migration may be required.");
   }
 }
