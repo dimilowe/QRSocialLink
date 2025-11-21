@@ -40,6 +40,55 @@ export const db = drizzle({ client: pool, schema });
 
 This configuration has been battle-tested and resolves SSL certificate issues that can occur with other PostgreSQL setups.
 
+### Database Migrations
+
+**Development vs Production:**
+- Development database uses the `DATABASE_URL` environment variable in the Replit workspace
+- Production database uses a separate `DATABASE_URL` configured in the deployment settings
+- Schema changes must be applied to both databases separately
+
+**Automatic Migration System:**
+- The app includes an automatic migration system (`server/migrate.ts`) that runs `drizzle-kit push` on production startup
+- This attempts to sync schema changes automatically but has limitations:
+  - May not detect all schema drift (e.g., missing columns)
+  - Fails silently to prevent production downtime
+  - Logs warnings when migrations fail
+
+**Manual Migration Process (Recommended for Critical Changes):**
+
+When you make schema changes in `shared/schema.ts`:
+
+1. **Development**: Run `npm run db:push` to apply changes to development database
+
+2. **Production**: Apply changes manually using SQL:
+   ```bash
+   # Get production DATABASE_URL from Deployments > Environment Variables
+   DATABASE_URL="<production_url>" psql -c "ALTER TABLE table_name ADD COLUMN column_name type;"
+   ```
+
+3. **Verify**: Check the column was added:
+   ```bash
+   DATABASE_URL="<production_url>" psql -c "\d table_name"
+   ```
+
+4. **Deploy**: Redeploy the app to restart with the updated schema
+
+**Common Migration Commands:**
+- Add column: `ALTER TABLE scans ADD COLUMN destination text;`
+- Check schema: `\d table_name`
+- List all tables: `\dt`
+
+**Production Database Access:**
+- Find production `DATABASE_URL` in: Deployments tab > qrsocial.studio > Environment Variables
+- Use `psql` with the production URL to run SQL commands
+- Always test commands on development first
+
+**Important Notes:**
+- Automatic migrations may fail to detect all schema changes
+- For critical schema updates, always use manual SQL migrations
+- Never change primary key types - this breaks existing data
+- Use `npm run db:push --force` if standard push doesn't work in development
+
 ## System Architecture
 
 **UI/UX Decisions:**
