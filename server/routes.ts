@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
+import bcrypt from "bcrypt";
 import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, insertFeedbackSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
@@ -262,6 +263,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const stats = await storage.getUserStats(req.params.id);
       res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/user/username", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { username } = req.body;
+      
+      if (!username || !username.trim()) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser && existingUser.id !== req.user.id) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
+      const updatedUser = await storage.updateUsername(req.user.id, username.trim());
+      const { password, ...safeUser } = updatedUser;
+      res.json(safeUser);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/user/password", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Both current and new password are required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updatePassword(req.user.id, hashedPassword);
+      
+      res.json({ message: "Password updated successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/create-portal-session", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ message: "No active subscription" });
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: user.stripeCustomerId,
+        return_url: `${req.protocol}://${req.get('host')}/settings`,
+      });
+
+      res.json({ url: session.url });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

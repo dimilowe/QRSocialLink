@@ -1,4 +1,4 @@
-import { QrCode, Home, Plus, LayoutDashboard, BarChart3, Sparkles, CreditCard } from "lucide-react";
+import { QrCode, Home, Plus, LayoutDashboard, BarChart3, Sparkles, CreditCard, Settings } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -69,6 +69,14 @@ export function TopHeader() {
             </Button>
           )}
           <ThemeToggle />
+          
+          {user && (
+            <Button variant="ghost" size="icon" className="hover-elevate" asChild data-testid="link-settings">
+              <Link href="/settings">
+                <Settings className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           
           {user ? (
             <Button variant="ghost" className="hover-elevate rounded-full h-auto p-0" asChild>

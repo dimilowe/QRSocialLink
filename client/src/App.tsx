@@ -18,6 +18,7 @@ import CampaignsPage from "@/pages/campaigns-page";
 import CampaignDetailPage from "@/pages/campaign-detail-page";
 import OverlayGeneratorPage from "@/pages/overlay-generator-page";
 import FeedbackPage from "@/pages/feedback-page";
+import SettingsPage from "@/pages/settings-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -68,6 +69,7 @@ function Router() {
         <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
         <Route path="/campaigns/:id" component={() => <ProtectedRoute component={CampaignDetailPage} />} />
         <Route path="/profile/:id" component={() => <ProtectedRoute component={ProfilePage} />} />
+        <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route component={NotFound} />
       </Switch>

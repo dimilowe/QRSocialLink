@@ -54,6 +54,8 @@ export interface IStorage {
     subscriptionId: string | null
   ): Promise<User>;
   updateUserPlan(userId: string, plan: string): Promise<User>;
+  updateUsername(userId: string, username: string): Promise<User>;
+  updatePassword(userId: string, hashedPassword: string): Promise<void>;
   
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: string): Promise<Scan | undefined>;
@@ -179,6 +181,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return result[0];
+  }
+
+  async updateUsername(userId: string, username: string): Promise<User> {
+    const result = await db
+      .update(users)
+      .set({ username })
+      .where(eq(users.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, userId));
   }
 
   async createScan(insertScan: InsertScan): Promise<Scan> {
