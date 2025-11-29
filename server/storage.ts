@@ -65,6 +65,7 @@ export interface IStorage {
   getUserScans(userId: string, limit?: number): Promise<Scan[]>;
   getUserScansPaginated(userId: string, limit: number, offset: number): Promise<Scan[]>;
   getFeed(currentUserId?: string, limit?: number): Promise<ScanWithUser[]>;
+  deleteScan(scanId: string): Promise<void>;
   
   followUser(followerId: string, followedId: string): Promise<Follower>;
   unfollowUser(followerId: string, followedId: string): Promise<void>;
@@ -295,6 +296,10 @@ export class DatabaseStorage implements IStorage {
     );
 
     return scansWithCounts;
+  }
+
+  async deleteScan(scanId: string): Promise<void> {
+    await db.delete(scans).where(eq(scans.id, scanId));
   }
 
   async followUser(followerId: string, followedId: string): Promise<Follower> {
