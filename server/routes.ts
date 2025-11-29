@@ -131,7 +131,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const canEdit = PLAN_LIMITS[userPlan]?.canEdit;
       
       const updateSchema = insertScanSchema.partial().omit({ userId: true, type: true, isPublic: true });
+      console.log("[PATCH scan] Received keys:", Object.keys(req.body), "qrImageUrl present:", !!req.body.qrImageUrl);
       const validatedData = updateSchema.parse(req.body);
+      console.log("[PATCH scan] Validated keys:", Object.keys(validatedData), "qrImageUrl present:", !!validatedData.qrImageUrl);
       
       if (!canEdit) {
         const freeEditableFields = ['title'];

@@ -650,8 +650,10 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         });
         
         updates.qrImageUrl = result.qrImageUrl;
+        console.log("[Edit Modal] QR regenerated, new URL length:", result.qrImageUrl?.length);
         setIsGenerating(false);
       } catch (error) {
+        console.error("[Edit Modal] QR generation failed:", error);
         setIsGenerating(false);
         toast({
           title: "QR Generation Failed",
@@ -662,6 +664,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       }
     }
     
+    console.log("[Edit Modal] Sending updates:", Object.keys(updates), "qrImageUrl included:", !!updates.qrImageUrl);
     updateMutation.mutate(updates);
   };
 
