@@ -208,6 +208,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/scans/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const scan = await storage.getScan(req.params.id);
+      if (!scan) {
+        return res.status(404).json({ message: "QR code not found" });
+      }
+
+      if (scan.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized to delete this QR code" });
+      }
+
+      await storage.deleteScan(req.params.id);
+      res.json({ message: "QR code deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/users/:id", async (req, res) => {
     try {
       const user = await storage.getUser(req.params.id);
