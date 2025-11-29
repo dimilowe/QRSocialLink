@@ -123,6 +123,32 @@ export default function DashboardPage() {
     }
   };
 
+  const deleteQRMutation = useMutation({
+    mutationFn: async (scanId: string) => {
+      return apiRequest('DELETE', `/api/scans/${scanId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/user/scans'] });
+      toast({
+        title: "QR code deleted",
+        description: "The QR code has been successfully deleted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete QR code",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteQR = (scanId: string) => {
+    if (confirm("Are you sure you want to delete this QR code? This cannot be undone.")) {
+      deleteQRMutation.mutate(scanId);
+    }
+  };
+
   const createdScans = scans || [];
   const createdOverlays = overlays || [];
   const planLimit = user?.plan === "free" ? 1 : user?.plan === "starter" ? 20 : user?.plan === "pro" ? 50 : -1;
@@ -243,6 +269,15 @@ export default function DashboardPage() {
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => handleDeleteQR(scan.id)}
+                    disabled={deleteQRMutation.isPending}
+                    data-testid={`button-delete-${scan.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               </Card>
