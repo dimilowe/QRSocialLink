@@ -21,7 +21,6 @@ import { useAuth } from "@/lib/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { generateBrandedQR } from "@/lib/qr-generator";
 
 interface EditQRModalProps {
   scan: Scan | null;
@@ -605,63 +604,11 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       updates.canvasFillColor = canvasFillColor;
     }
     
-    const hasVisualChanges = 
-      foregroundColor !== (originalScan.foregroundColor || "#000000") ||
-      backgroundColor !== (originalScan.backgroundColor || "#FFFFFF") ||
-      borderColor !== (originalScan.borderColor || "#8B5CF6") ||
-      enableBranding !== (originalScan.enableBranding || false) ||
-      normalizeValue(newTopText) !== normalizeValue(originalScan.topText) ||
-      normalizeValue(newBottomText) !== normalizeValue(originalScan.bottomText) ||
-      normalizeValue(backgroundImage) !== normalizeValue(originalScan.backgroundImage) ||
-      borderShape !== (originalScan.borderShape || "square") ||
-      imageFit !== (originalScan.imageFitMode || "cover") ||
-      normalizeValue(newPolaroidText) !== normalizeValue(originalScan.polaroidText) ||
-      canvasFillEnabled !== ((originalScan as any).canvasFillEnabled || false) ||
-      canvasFillColor !== ((originalScan as any).canvasFillColor || "#FFFFFF");
-    
-    if (hasVisualChanges) {
-      try {
-        setIsGenerating(true);
-        const trackingUrl = scan.dynamicSlug 
-          ? `${window.location.origin}/q/${scan.dynamicSlug}`
-          : url.trim();
-        
-        let detectedImageType: string | null = null;
-        if (backgroundImage) {
-          const match = backgroundImage.match(/^data:(image\/[a-zA-Z]+);/);
-          detectedImageType = match ? match[1] : "image/png";
-        }
-        
-        const result = await generateBrandedQR({
-          targetUrl: trackingUrl,
-          foregroundColor,
-          backgroundColor,
-          borderColor,
-          topText: enableBranding ? topText : "",
-          bottomText: enableBranding ? bottomText : "",
-          enableBranding,
-          backgroundImage,
-          backgroundImageType: detectedImageType,
-          imageFit,
-          borderShape,
-          polaroidText: borderShape === "polaroid" ? polaroidText : "",
-          canvasFillEnabled,
-          canvasFillColor,
-        });
-        
-        updates.qrImageUrl = result.qrImageUrl;
-        console.log("[Edit Modal] QR regenerated, new URL length:", result.qrImageUrl?.length);
-        setIsGenerating(false);
-      } catch (error) {
-        console.error("[Edit Modal] QR generation failed:", error);
-        setIsGenerating(false);
-        toast({
-          title: "QR Generation Failed",
-          description: "Could not regenerate QR code with new styling",
-          variant: "destructive",
-        });
-        return;
-      }
+    // Always use the current preview as the saved QR image
+    // This ensures the dashboard shows exactly what's in the preview
+    if (qrPreviewUrl && qrPreviewUrl !== scan.qrImageUrl) {
+      updates.qrImageUrl = qrPreviewUrl;
+      console.log("[Edit Modal] Using preview as new QR image, length:", qrPreviewUrl?.length);
     }
     
     console.log("[Edit Modal] Sending updates:", Object.keys(updates), "qrImageUrl included:", !!updates.qrImageUrl);
