@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { generateBrandedQR } from "@/lib/qr-generator";
 
 interface EditQRModalProps {
   scan: Scan | null;
@@ -490,7 +491,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scan || !originalScan) return;
 
@@ -540,71 +541,128 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     const updates: any = {};
     const normalizeValue = (val: any) => val || null;
       
-      if (enableABTesting) {
-        updates.destination = null;
-        updates.redirectUrl = null;
-        updates.campaignId = selectedCampaignId;
-      } else {
-        updates.destination = url.trim();
-        updates.campaignId = null;
+    if (enableABTesting) {
+      updates.destination = null;
+      updates.redirectUrl = null;
+      updates.campaignId = selectedCampaignId;
+    } else {
+      updates.destination = url.trim();
+      updates.campaignId = null;
+    }
+    
+    if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
+      updates.title = title.trim() || null;
+    }
+    
+    if (foregroundColor !== (originalScan.foregroundColor || "#000000")) {
+      updates.foregroundColor = foregroundColor;
+    }
+    
+    if (backgroundColor !== (originalScan.backgroundColor || "#FFFFFF")) {
+      updates.backgroundColor = backgroundColor;
+    }
+    
+    if (borderColor !== (originalScan.borderColor || "#8B5CF6")) {
+      updates.borderColor = borderColor;
+    }
+    
+    if (enableBranding !== (originalScan.enableBranding || false)) {
+      updates.enableBranding = enableBranding;
+    }
+    
+    const newTopText = enableBranding ? topText : null;
+    if (normalizeValue(newTopText) !== normalizeValue(originalScan.topText)) {
+      updates.topText = newTopText;
+    }
+    
+    const newBottomText = enableBranding ? bottomText : null;
+    if (normalizeValue(newBottomText) !== normalizeValue(originalScan.bottomText)) {
+      updates.bottomText = newBottomText;
+    }
+    
+    if (normalizeValue(backgroundImage) !== normalizeValue(originalScan.backgroundImage)) {
+      updates.backgroundImage = backgroundImage || null;
+    }
+    
+    if (borderShape !== (originalScan.borderShape || "square")) {
+      updates.borderShape = borderShape;
+    }
+    
+    if (imageFit !== (originalScan.imageFitMode || "cover")) {
+      updates.imageFitMode = imageFit;
+    }
+    
+    const newPolaroidText = borderShape === "polaroid" ? polaroidText : null;
+    if (normalizeValue(newPolaroidText) !== normalizeValue(originalScan.polaroidText)) {
+      updates.polaroidText = newPolaroidText;
+    }
+    
+    if (canvasFillEnabled !== ((originalScan as any).canvasFillEnabled || false)) {
+      updates.canvasFillEnabled = canvasFillEnabled;
+    }
+    
+    if (canvasFillColor !== ((originalScan as any).canvasFillColor || "#FFFFFF")) {
+      updates.canvasFillColor = canvasFillColor;
+    }
+    
+    const hasVisualChanges = 
+      foregroundColor !== (originalScan.foregroundColor || "#000000") ||
+      backgroundColor !== (originalScan.backgroundColor || "#FFFFFF") ||
+      borderColor !== (originalScan.borderColor || "#8B5CF6") ||
+      enableBranding !== (originalScan.enableBranding || false) ||
+      normalizeValue(newTopText) !== normalizeValue(originalScan.topText) ||
+      normalizeValue(newBottomText) !== normalizeValue(originalScan.bottomText) ||
+      normalizeValue(backgroundImage) !== normalizeValue(originalScan.backgroundImage) ||
+      borderShape !== (originalScan.borderShape || "square") ||
+      imageFit !== (originalScan.imageFitMode || "cover") ||
+      normalizeValue(newPolaroidText) !== normalizeValue(originalScan.polaroidText) ||
+      canvasFillEnabled !== ((originalScan as any).canvasFillEnabled || false) ||
+      canvasFillColor !== ((originalScan as any).canvasFillColor || "#FFFFFF");
+    
+    if (hasVisualChanges) {
+      try {
+        setIsGenerating(true);
+        const trackingUrl = scan.dynamicSlug 
+          ? `${window.location.origin}/q/${scan.dynamicSlug}`
+          : url.trim();
+        
+        let detectedImageType: string | null = null;
+        if (backgroundImage) {
+          const match = backgroundImage.match(/^data:(image\/[a-zA-Z]+);/);
+          detectedImageType = match ? match[1] : "image/png";
+        }
+        
+        const result = await generateBrandedQR({
+          targetUrl: trackingUrl,
+          foregroundColor,
+          backgroundColor,
+          borderColor,
+          topText: enableBranding ? topText : "",
+          bottomText: enableBranding ? bottomText : "",
+          enableBranding,
+          backgroundImage,
+          backgroundImageType: detectedImageType,
+          imageFit,
+          borderShape,
+          polaroidText: borderShape === "polaroid" ? polaroidText : "",
+          canvasFillEnabled,
+          canvasFillColor,
+        });
+        
+        updates.qrImageUrl = result.qrImageUrl;
+        setIsGenerating(false);
+      } catch (error) {
+        setIsGenerating(false);
+        toast({
+          title: "QR Generation Failed",
+          description: "Could not regenerate QR code with new styling",
+          variant: "destructive",
+        });
+        return;
       }
-      
-      if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
-        updates.title = title.trim() || null;
-      }
-      
-      if (foregroundColor !== (originalScan.foregroundColor || "#000000")) {
-        updates.foregroundColor = foregroundColor;
-      }
-      
-      if (backgroundColor !== (originalScan.backgroundColor || "#FFFFFF")) {
-        updates.backgroundColor = backgroundColor;
-      }
-      
-      if (borderColor !== (originalScan.borderColor || "#8B5CF6")) {
-        updates.borderColor = borderColor;
-      }
-      
-      if (enableBranding !== (originalScan.enableBranding || false)) {
-        updates.enableBranding = enableBranding;
-      }
-      
-      const newTopText = enableBranding ? topText : null;
-      if (normalizeValue(newTopText) !== normalizeValue(originalScan.topText)) {
-        updates.topText = newTopText;
-      }
-      
-      const newBottomText = enableBranding ? bottomText : null;
-      if (normalizeValue(newBottomText) !== normalizeValue(originalScan.bottomText)) {
-        updates.bottomText = newBottomText;
-      }
-      
-      if (normalizeValue(backgroundImage) !== normalizeValue(originalScan.backgroundImage)) {
-        updates.backgroundImage = backgroundImage || null;
-      }
-      
-      if (borderShape !== (originalScan.borderShape || "square")) {
-        updates.borderShape = borderShape;
-      }
-      
-      if (imageFit !== (originalScan.imageFitMode || "cover")) {
-        updates.imageFitMode = imageFit;
-      }
-      
-      const newPolaroidText = borderShape === "polaroid" ? polaroidText : null;
-      if (normalizeValue(newPolaroidText) !== normalizeValue(originalScan.polaroidText)) {
-        updates.polaroidText = newPolaroidText;
-      }
-      
-      if (canvasFillEnabled !== ((originalScan as any).canvasFillEnabled || false)) {
-        updates.canvasFillEnabled = canvasFillEnabled;
-      }
-      
-      if (canvasFillColor !== ((originalScan as any).canvasFillColor || "#FFFFFF")) {
-        updates.canvasFillColor = canvasFillColor;
-      }
-      
-      updateMutation.mutate(updates);
+    }
+    
+    updateMutation.mutate(updates);
   };
 
   const shapeButtons = [
