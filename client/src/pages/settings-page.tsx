@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, CreditCard, User, Lock, ExternalLink } from "lucide-react";
+import { Settings, CreditCard, User, Lock, ExternalLink, Copy, Check } from "lucide-react";
 import { PLAN_LIMITS } from "@shared/schema";
 
 const PLAN_NAMES = {
@@ -33,6 +33,19 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [copiedUserId, setCopiedUserId] = useState(false);
+
+  const handleCopyUserId = () => {
+    if (user?.id) {
+      navigator.clipboard.writeText(String(user.id));
+      setCopiedUserId(true);
+      toast({
+        title: "Copied!",
+        description: "User ID copied to clipboard",
+      });
+      setTimeout(() => setCopiedUserId(false), 2000);
+    }
+  };
 
   const updateUsernameMutation = useMutation({
     mutationFn: async (newUsername: string) => {
@@ -271,6 +284,29 @@ export default function SettingsPage() {
                 data-testid="input-email"
               />
               <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user-id">User ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="user-id"
+                  value={user.id}
+                  readOnly
+                  className="bg-muted font-mono"
+                  data-testid="input-user-id"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyUserId}
+                  data-testid="button-copy-user-id"
+                >
+                  {copiedUserId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Use this ID to connect with VCM OS or other integrations</p>
             </div>
 
             <div className="space-y-2">
