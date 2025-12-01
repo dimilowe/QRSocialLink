@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { OverlayProcessor } from "./overlay-processor";
 import { storage } from "./storage";
 import { runMigrations } from "./migrate";
+import { mirrorYesterdayAnalyticsToVcmOs } from "./services/analyticsAggregation";
 
 const app = express();
 
@@ -84,5 +85,19 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
     
     overlayProcessor.start();
+    
+    // VCM OS Analytics Mirroring - fire-and-forget, non-blocking
+    // Run once at startup (for testing/catchup)
+    mirrorYesterdayAnalyticsToVcmOs().catch(err => {
+      console.error("[VCM OS Mirror] Startup mirror failed:", err);
+    });
+    
+    // Run every 24 hours
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+      mirrorYesterdayAnalyticsToVcmOs().catch(err => {
+        console.error("[VCM OS Mirror] Scheduled mirror failed:", err);
+      });
+    }, ONE_DAY);
   });
 })();

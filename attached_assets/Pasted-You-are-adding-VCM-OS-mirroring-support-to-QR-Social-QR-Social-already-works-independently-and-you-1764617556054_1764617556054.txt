@@ -1,0 +1,157 @@
+You are adding VCM OS mirroring support to QR Social. QR Social already works independently, and you must NOT change existing business logic. You are only adding the ability to send daily analytics snapshots to the VCM OS mirror API.
+Follow this exact specification:
+1. Add Environment Variables
+Add the following environment variables to .env:
+VCM_OS_BASE_URL=https://<YOUR_VCM_OS_DOMAIN>
+VCM_OS_API_KEY_QR_SOCIAL=<THE_SECRET_KEY_YOU_CONFIGURED_IN_OS>
+VCM_OS_APP_NAME=QR_SOCIAL
+Do not hardcode these anywhere. Load them through process.env.
+2. Create a new integration client
+Create file:
+/src/integrations/vcmOsClient.ts
+Add the following code:
+import fetch from "node-fetch";
+
+const VCM_OS_BASE_URL = process.env.VCM_OS_BASE_URL!;
+const VCM_OS_API_KEY = process.env.VCM_OS_API_KEY_QR_SOCIAL!;
+const VCM_OS_APP_NAME = process.env.VCM_OS_APP_NAME || "QR_SOCIAL";
+
+if (!VCM_OS_BASE_URL || !VCM_OS_API_KEY) {
+  console.warn("[VCM OS] Missing env vars – mirroring disabled.");
+}
+
+export type AnalyticsSnapshotPayload = {
+  app_offer_id: string;
+  snapshot_period_start: string;
+  snapshot_period_end: string;
+  visits: number;
+  conversions: number;
+  revenue: number;
+  raw_metrics?: Record<string, any>;
+};
+
+export async function sendAnalyticsToVcmOs(
+  appUserId: string,
+  snapshots: AnalyticsSnapshotPayload[]
+): Promise<void> {
+  if (!VCM_OS_BASE_URL || !VCM_OS_API_KEY) return;
+  if (!snapshots.length) return;
+
+  try {
+    const res = await fetch(`${VCM_OS_BASE_URL}/api/mirror/analytics`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-APP-NAME": VCM_OS_APP_NAME,
+        "X-APP-API-KEY": VCM_OS_API_KEY,
+        "X-APP-USER-ID": appUserId,
+      },
+      body: JSON.stringify(snapshots),
+    });
+
+    if (!res.ok) {
+      console.error("[VCM OS] Failed to mirror analytics:", await res.text());
+    }
+  } catch (err) {
+    console.error("[VCM OS] Error sending analytics:", err);
+  }
+}
+3. Create aggregation logic
+Create file:
+/src/services/analyticsAggregation.ts
+Paste:
+import { db } from "../db";
+import { sendAnalyticsToVcmOs, AnalyticsSnapshotPayload } from "../integrations/vcmOsClient";
+
+function getYesterdayRange() {
+  const now = new Date();
+  const start = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 1,
+    0,0,0
+  ));
+  const end = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 1,
+    23,59,59
+  ));
+  return { start, end };
+}
+
+export async function mirrorYesterdayAnalyticsToVcmOs() {
+  const { start, end } = getYesterdayRange();
+
+  const rows = await db.query(`
+    SELECT 
+      qr_codes.user_id AS user_id,
+      qr_codes.id AS qr_id,
+      COUNT(qr_scans.id) AS scan_count,
+      COUNT(DISTINCT qr_scans.ip) AS unique_scanners
+    FROM qr_codes
+    LEFT JOIN qr_scans 
+      ON qr_scans.qr_id = qr_codes.id
+      AND qr_scans.scanned_at >= $1
+      AND qr_scans.scanned_at <= $2
+    GROUP BY qr_codes.user_id, qr_codes.id
+  `, [start.toISOString(), end.toISOString()]);
+
+  const byUser: Record<string, AnalyticsSnapshotPayload[]> = {};
+
+  for (const row of rows) {
+    const userId = row.user_id;
+    if (!byUser[userId]) byUser[userId] = [];
+
+    byUser[userId].push({
+      app_offer_id: String(row.qr_id),
+      snapshot_period_start: start.toISOString(),
+      snapshot_period_end: end.toISOString(),
+      visits: Number(row.scan_count) || 0,
+      conversions: Number(row.scan_count) || 0,
+      revenue: 0,
+      raw_metrics: {
+        unique_scanners: Number(row.unique_scanners) || 0
+      }
+    });
+  }
+
+  for (const [userId, snapshots] of Object.entries(byUser)) {
+    await sendAnalyticsToVcmOs(userId, snapshots);
+  }
+}
+4. Register daily mirroring worker
+Open your main server file (typically src/index.ts or src/server.ts) and add:
+import { mirrorYesterdayAnalyticsToVcmOs } from "./services/analyticsAggregation";
+
+// Run at startup for testing
+mirrorYesterdayAnalyticsToVcmOs().catch(console.error);
+
+// Run every 24 hours
+const ONE_DAY = 24 * 60 * 60 * 1000;
+setInterval(() => {
+  mirrorYesterdayAnalyticsToVcmOs().catch(console.error);
+}, ONE_DAY);
+This should run silently and never block the server.
+5. Requirements
+DO NOT modify existing QR routing logic.
+DO NOT add any dependency from QR Social → VCM OS during runtime of redirects.
+Mirroring must be fire-and-forget.
+If VCM OS is down, QR Social continues working 100% normally.
+Analytics must batch per user, not per scan.
+6. After implementing:
+Test with a manual cURL from QR Social backend:
+curl -X POST https://<YOUR_VCM_OS_DOMAIN>/api/mirror/analytics \
+-H "X-APP-NAME: QR_SOCIAL" \
+-H "X-APP-API-KEY: <THESECRET>" \
+-H "X-APP-USER-ID: <USERID>" \
+-H "Content-Type: application/json" \
+-d '[{
+  "app_offer_id":"test_qr",
+  "snapshot_period_start":"2025-12-01T00:00:00.000Z",
+  "snapshot_period_end":"2025-12-01T23:59:59.000Z",
+  "visits": 20,
+  "conversions": 20,
+  "revenue": 0
+}]'
+You should see new analytics rows in VCM OS.
