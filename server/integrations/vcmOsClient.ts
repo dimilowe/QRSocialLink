@@ -2,8 +2,16 @@ const VCM_OS_BASE_URL = process.env.VCM_OS_BASE_URL;
 const VCM_OS_API_KEY = process.env.VCM_OS_API_KEY_QR_SOCIAL;
 const VCM_OS_APP_NAME = process.env.VCM_OS_APP_NAME || "QR_SOCIAL";
 
-if (!VCM_OS_BASE_URL || !VCM_OS_API_KEY) {
-  console.log("[VCM OS] Missing env vars – mirroring disabled.");
+let envWarningShown = false;
+function checkEnvVars(): boolean {
+  if (!VCM_OS_BASE_URL || !VCM_OS_API_KEY) {
+    if (!envWarningShown) {
+      console.log("[VCM OS] Missing env vars – mirroring disabled.");
+      envWarningShown = true;
+    }
+    return false;
+  }
+  return true;
 }
 
 export type AnalyticsSnapshotPayload = {
@@ -20,7 +28,7 @@ export async function sendAnalyticsToVcmOs(
   appUserId: string,
   snapshots: AnalyticsSnapshotPayload[]
 ): Promise<void> {
-  if (!VCM_OS_BASE_URL || !VCM_OS_API_KEY) return;
+  if (!checkEnvVars()) return;
   if (!snapshots.length) return;
 
   try {
@@ -29,7 +37,7 @@ export async function sendAnalyticsToVcmOs(
       headers: {
         "Content-Type": "application/json",
         "X-APP-NAME": VCM_OS_APP_NAME,
-        "X-APP-API-KEY": VCM_OS_API_KEY,
+        "X-APP-API-KEY": VCM_OS_API_KEY!,
         "X-APP-USER-ID": appUserId,
       },
       body: JSON.stringify(snapshots),
@@ -43,4 +51,45 @@ export async function sendAnalyticsToVcmOs(
   } catch (err) {
     console.error("[VCM OS] Error sending analytics:", err);
   }
+}
+
+export type ScanEventPayload = {
+  app_slug: string;
+  event_type: string;
+  event_at: string;
+  app_user_identifier: string;
+  metadata: {
+    qr_id: string | null;
+    scan_id: string | null;
+    destination_url: string | null;
+    user_agent: string;
+    ip_hash: string;
+    device_type: string | null;
+    platform: string | null;
+    os: string | null;
+    browser: string | null;
+  };
+};
+
+export function pushScanEventToVcmOs(payload: ScanEventPayload): void {
+  if (!checkEnvVars()) return;
+
+  fetch(`${VCM_OS_BASE_URL}/api/mirror/events`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-APP-NAME": VCM_OS_APP_NAME,
+      "X-APP-API-KEY": VCM_OS_API_KEY!,
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("[VCM OS] Event push error:", text);
+      }
+    })
+    .catch((err) => {
+      console.error("[VCM OS] Event push failed:", err.message || err);
+    });
 }

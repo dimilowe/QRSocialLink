@@ -1,0 +1,87 @@
+✅ Replit Build Prompt: Add Event-Based Analytics Push (QR Social → VCM OS)
+Paste this entire prompt into Replit:
+REPLIT PROMPT START
+You are modifying the QR Social codebase.
+Add event-based analytics mirroring so that every QR scan automatically pushes an analytics event into VCM OS.
+1. Add new environment variables
+Create or update the .env file with the following:
+VCM_OS_ANALYTICS_URL=https://YOUR-VCM-OS-URL/api/mirror/analytics
+APP_API_KEY_QR_SOCIAL=YOUR_QR_SOCIAL_KEY
+(Replace both with the real values from VCM OS.)
+2. Locate the QR redirect/scan handler
+Find the file that handles scanning and redirecting.
+Typical examples (depending on the codebase):
+routes/redirect.ts
+routes/scan.ts
+server.ts
+or the endpoint handling GET /:slug
+Inside the route that performs:
+Find QR route by slug
+Log the scan
+Redirect user to targetUrl
+Insert the following code right after you save/log the scan, but before the redirect:
+// ------------------------------------------
+// MIRROR ANALYTICS TO VCM OS (EVENT-BASED)
+// ------------------------------------------
+try {
+  const payload = {
+    app_slug: "qr_social",
+    event_type: "qr_scan",
+    event_at: new Date().toISOString(),
+    app_user_identifier: route?.ownerUsername ?? "unknown_user",
+    metadata: {
+      qr_id: route?.qrId ?? null,
+      route_id: route?.id ?? null,
+      user_agent: req.headers["user-agent"] || "",
+      ip: req.ip || req.headers["x-forwarded-for"] || "",
+    },
+  };
+
+  // Fire and forget (non-blocking)
+  fetch(process.env.VCM_OS_ANALYTICS_URL!, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-app-api-key": process.env.APP_API_KEY_QR_SOCIAL!,
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        console.error("VCM OS mirror error:", await res.text());
+      }
+    })
+    .catch((err) => {
+      console.error("VCM OS mirror failed:", err);
+    });
+
+} catch (err) {
+  console.error("Analytics push exception:", err);
+}
+// ------------------------------------------
+This code must run for every scan.
+3. DO NOT block the redirect
+Make sure the redirect remains:
+return res.redirect(route.targetUrl);
+4. Logs
+After deployment, scan a QR code and look at Replit Logs.
+You should see logs like:
+VCM OS mirror failed: ...
+or
+VCM OS mirror error: ...
+or nothing (means success)
+5. Test the connection
+Send a manual test scan:
+Open any QR Social code URL with a real QR route
+Or call the redirect path with a slug
+Then refresh VCM OS analytics dashboard
+Data appears instantly
+6. If your analytics endpoint expects arrays
+(Only if VCM OS uses bulk insert)
+Wrap payload like this:
+body: JSON.stringify({ events: [payload] })
+Otherwise send the single object as written above.
+7. Finish
+After adding this code, deploy QR Social.
+From now on: every scan automatically mirrors into VCM OS in real-time.
+REPLIT PROMPT END

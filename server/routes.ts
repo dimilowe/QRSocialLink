@@ -13,6 +13,7 @@ import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 import os from "os";
+import { pushScanEventToVcmOs } from "./integrations/vcmOsClient";
 
 const execAsync = promisify(exec);
 
@@ -911,6 +912,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         osVersion: uaResult.os.version || null,
         browser: uaResult.browser.name || null,
         browserVersion: uaResult.browser.version || null,
+      });
+
+      pushScanEventToVcmOs({
+        app_slug: "qr_social",
+        event_type: "qr_scan",
+        event_at: new Date().toISOString(),
+        app_user_identifier: String(scan.userId),
+        metadata: {
+          qr_id: scan.id,
+          scan_id: scan.id,
+          destination_url: destinationUrl,
+          user_agent: userAgentString,
+          ip_hash: ipHash,
+          device_type: deviceType,
+          platform,
+          os: uaResult.os.name || null,
+          browser: uaResult.browser.name || null,
+        },
       });
 
       res.redirect(302, destinationUrl);
