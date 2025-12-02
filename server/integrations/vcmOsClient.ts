@@ -80,6 +80,7 @@ export function pushScanEventToVcmOs(payload: ScanEventPayload): void {
       "Content-Type": "application/json",
       "X-APP-NAME": VCM_OS_APP_NAME,
       "X-APP-API-KEY": VCM_OS_API_KEY!,
+      "X-APP-USER-ID": payload.app_user_identifier,
     },
     body: JSON.stringify(payload),
   })
