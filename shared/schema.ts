@@ -12,14 +12,17 @@ export const PLAN_TIERS = {
 
 export type PlanTier = typeof PLAN_TIERS[keyof typeof PLAN_TIERS];
 
+// BETA MODE: All features unlocked for free tier
+// To restore monetization, revert free tier limits to:
+// maxQRs: 0, canEdit: false, canDownload: false, canSave: false, hasAnalytics: false, hasBranding: false
 export const PLAN_LIMITS = {
   free: {
-    maxQRs: 0,
-    canEdit: false,
-    canDownload: false,
-    canSave: false,
-    hasAnalytics: false,
-    hasBranding: false,
+    maxQRs: -1,        // Unlimited during beta
+    canEdit: true,     // Unlocked during beta
+    canDownload: true, // Unlocked during beta
+    canSave: true,     // Unlocked during beta
+    hasAnalytics: true, // Unlocked during beta
+    hasBranding: true,  // Unlocked during beta (removes watermark)
   },
   starter: {
     maxQRs: 20,
