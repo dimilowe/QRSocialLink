@@ -19,7 +19,7 @@ export default function HomePage() {
               Create branded QR codes, track performance with A/B testing, and drive traffic from social media
             </p>
             <div className="flex gap-4 justify-center">
-              <Link href="/auth">
+              <Link href="/create">
                 <Button size="lg" data-testid="button-get-started">
                   Get Started Free
                 </Button>
