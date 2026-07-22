@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon, Square, Circle, Star, Heart, Diamond } from "lucide-react";
+import { Sparkles, AlertCircle, Download, Upload, X, Image as ImageIcon, Square, Circle, Star, Heart, Diamond, LogIn } from "lucide-react";
 import { insertScanSchema } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -608,11 +608,7 @@ export default function CreateQRPage() {
 
   const onSubmit = (data: CreateQRFormData) => {
     if (!user) {
-      toast({
-        title: "Login required",
-        description: "Please log in to create QR codes",
-        variant: "destructive",
-      });
+      setLocation("/auth");
       return;
     }
     if (enableABTesting && !selectedCampaignId) {
@@ -710,6 +706,21 @@ export default function CreateQRPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {!user && (
+          <div className="flex items-center justify-between gap-4 p-4 rounded-lg border bg-primary/5 border-primary/20">
+            <div className="flex items-center gap-3 min-w-0">
+              <LogIn className="h-5 w-5 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Sign up to save &amp; track your QR codes</p>
+                <p className="text-xs text-muted-foreground">Build and preview for free — create an account to enable analytics and save your codes.</p>
+              </div>
+            </div>
+            <Button size="sm" asChild className="shrink-0" data-testid="button-guest-signup">
+              <a href="/auth">Sign Up Free</a>
+            </Button>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <Sparkles className="h-8 w-8 text-primary" />
           <div>

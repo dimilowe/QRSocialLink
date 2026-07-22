@@ -63,7 +63,7 @@ function Router() {
         <Route path="/pricing" component={PricingPage} />
         <Route path="/subscribe/success" component={() => <ProtectedRoute component={SubscribeSuccessPage} />} />
         <Route path="/feedback" component={FeedbackPage} />
-        <Route path="/create" component={() => <ProtectedRoute component={CreateQRPage} />} />
+        <Route path="/create" component={CreateQRPage} />
         <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />
         <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardPage} />} />
         <Route path="/campaigns" component={() => <ProtectedRoute component={CampaignsPage} />} />
@@ -73,7 +73,7 @@ function Router() {
         <Route path="/subscribe" component={() => <ProtectedRoute component={SubscribePage} />} />
         <Route component={NotFound} />
       </Switch>
-      {user && <BottomNav />}
+      <BottomNav />
     </>
   );
 }

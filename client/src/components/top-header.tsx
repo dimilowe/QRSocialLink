@@ -36,9 +36,10 @@ export function TopHeader() {
           </Link>
         </Button>
 
-        {user && (
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems
+            .filter((item) => user || item.path === "/create" || item.path === "/pricing")
+            .map((item) => {
               const Icon = item.icon;
               const isActive = location === item.path;
               return (
@@ -56,8 +57,7 @@ export function TopHeader() {
                 </Button>
               );
             })}
-          </nav>
-        )}
+        </nav>
 
         <div className="flex items-center gap-2">
           {!user && (

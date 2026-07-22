@@ -1,4 +1,4 @@
-import { Home, Plus, BarChart3, LayoutDashboard, CreditCard } from "lucide-react";
+import { Home, Plus, LayoutDashboard, CreditCard, LogIn } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
@@ -7,35 +7,21 @@ export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  if (!user) return null;
-
-  const navItems = [
-    {
-      icon: Home,
-      label: "Home",
-      path: "/",
-    },
-    {
-      icon: Plus,
-      label: "Create",
-      path: "/create",
-    },
-    {
-      icon: BarChart3,
-      label: "Campaigns",
-      path: "/campaigns",
-    },
-    {
-      icon: LayoutDashboard,
-      label: "QR Codes",
-      path: "/dashboard",
-    },
-    {
-      icon: CreditCard,
-      label: "Pricing",
-      path: "/pricing",
-    },
+  const authedNavItems = [
+    { icon: Home, label: "Home", path: "/" },
+    { icon: Plus, label: "Create", path: "/create" },
+    { icon: LayoutDashboard, label: "QR Codes", path: "/dashboard" },
+    { icon: CreditCard, label: "Pricing", path: "/pricing" },
   ];
+
+  const guestNavItems = [
+    { icon: Home, label: "Home", path: "/" },
+    { icon: Plus, label: "Create", path: "/create" },
+    { icon: CreditCard, label: "Pricing", path: "/pricing" },
+    { icon: LogIn, label: "Sign Up", path: "/auth" },
+  ];
+
+  const navItems = user ? authedNavItems : guestNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-card-border z-50 md:hidden">
@@ -43,12 +29,12 @@ export function BottomNav() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.path;
-          
+
           return (
             <Link
               key={item.path}
               href={item.path}
-              data-testid={`nav-${item.label.toLowerCase()}`}
+              data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
             >
               <button
                 className={cn(
