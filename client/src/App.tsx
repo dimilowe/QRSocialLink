@@ -61,7 +61,7 @@ function Router() {
         </Route>
         <Route path="/" component={HomePage} />
         <Route path="/pricing" component={PricingPage} />
-        <Route path="/subscribe/success" component={() => <ProtectedRoute component={SubscribeSuccessPage} />} />
+        <Route path="/subscribe/success" component={SubscribeSuccessPage} />
         <Route path="/feedback" component={FeedbackPage} />
         <Route path="/create" component={CreateQRPage} />
         <Route path="/overlays" component={() => <ProtectedRoute component={OverlayGeneratorPage} />} />

@@ -8,6 +8,7 @@ import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDest
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
+import { crypto as authCrypto } from "./auth";
 import fs from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
@@ -38,6 +39,15 @@ const PLAN_PRICES = {
     name: "QR Social Unlimited",
   },
 } as const;
+
+// In-memory store for new accounts created during guest checkout (expires 15 min)
+interface GuestCheckoutEntry {
+  email: string;
+  tempPassword: string;
+  isNewAccount: boolean;
+  expiresAt: number;
+}
+const guestCheckoutMap = new Map<string, GuestCheckoutEntry>();
 
 function detectPlatform(referrer: string | null): string | null {
   if (!referrer) return null;
@@ -1162,10 +1172,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const userId = session.metadata?.userId;
           const planTier = (session.metadata?.planTier || "pro") as PlanTier;
 
-          if (userId && customerId && subscriptionId) {
+          if (userId) {
+            // Authenticated user checkout — existing flow
             await storage.updateUserStripeInfo(userId, customerId, subscriptionId);
             await storage.updateUserPlan(userId, planTier);
             console.log(`Checkout completed: User ${userId} subscribed to ${planTier}`);
+          } else {
+            // Guest checkout — find or create account from Stripe email
+            const email = session.customer_details?.email;
+            if (email && customerId && subscriptionId) {
+              let user = await storage.getUserByEmail(email);
+              let isNewAccount = false;
+              let tempPassword: string | null = null;
+
+              if (!user) {
+                // Auto-create account using payment email
+                const rawPassword = crypto.randomBytes(6).toString('base64url'); // ~8 chars
+                const hashedPassword = await authCrypto.hash(rawPassword);
+                // Derive a clean username from the email, ensure uniqueness
+                const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'user';
+                const username = `${baseUsername}_${crypto.randomBytes(3).toString('hex')}`;
+                user = await storage.createUser({ email, username, password: hashedPassword });
+                isNewAccount = true;
+                tempPassword = rawPassword;
+                console.log(`[Checkout] Auto-created account for ${email} (username: ${username})`);
+              } else {
+                console.log(`[Checkout] Linked existing account ${user.id} to guest checkout`);
+              }
+
+              await storage.updateUserStripeInfo(user.id, customerId, subscriptionId);
+              await storage.updateUserPlan(user.id, planTier);
+
+              // Store temp credentials so the success page can show them (15 min window)
+              if (isNewAccount && tempPassword) {
+                guestCheckoutMap.set(session.id, {
+                  email,
+                  tempPassword,
+                  isNewAccount: true,
+                  expiresAt: Date.now() + 15 * 60 * 1000,
+                });
+              }
+            }
           }
           break;
         }
@@ -1237,96 +1284,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/create-checkout-session", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
-    }
-
-    const user = req.user;
     const { planTier } = req.body;
-
-    console.log(`[Checkout] User ${user.id} (${user.email}) requesting ${planTier} plan. Current plan: ${user.plan}, Stripe Sub: ${user.stripeSubscriptionId}`);
 
     if (!planTier || !["starter", "pro", "unlimited"].includes(planTier)) {
       return res.status(400).json({ error: "Invalid plan tier" });
     }
 
-    if (!user.email) {
-      throw new Error("No user email on file");
-    }
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? 'https://qrsocial.io'
+      : `${req.protocol}://${req.get('host')}`;
 
     try {
-      let customerId = user.stripeCustomerId;
-      
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: user.username,
-          metadata: {
-            userId: user.id,
-          },
-        });
-        customerId = customer.id;
-        await storage.updateUserStripeInfo(user.id, customerId, null);
-        console.log(`[Checkout] Created new Stripe customer: ${customerId}`);
-      }
+      // ── Authenticated user path ──────────────────────────────────────────
+      if (req.isAuthenticated()) {
+        const user = req.user;
+        console.log(`[Checkout] User ${user.id} (${user.email}) requesting ${planTier} plan. Current plan: ${user.plan}, Stripe Sub: ${user.stripeSubscriptionId}`);
 
-      if (user.stripeSubscriptionId) {
-        console.log(`[Checkout] User has existing subscription ID: ${user.stripeSubscriptionId}`);
-        try {
-          const subscription = await stripe.subscriptions.retrieve(
-            user.stripeSubscriptionId
-          );
+        let customerId = user.stripeCustomerId;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: user.email!,
+            name: user.username,
+            metadata: { userId: user.id },
+          });
+          customerId = customer.id;
+          await storage.updateUserStripeInfo(user.id, customerId, null);
+          console.log(`[Checkout] Created new Stripe customer: ${customerId}`);
+        }
 
-          const currentPlanTier = subscription.metadata?.planTier;
-          const activeStatuses = ['active', 'trialing', 'past_due'];
-          const isActive = activeStatuses.includes(subscription.status);
-          console.log(`[Checkout] Retrieved subscription. Plan tier: ${currentPlanTier}, Status: ${subscription.status}, Active: ${isActive}`);
+        if (user.stripeSubscriptionId) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+            const currentPlanTier = subscription.metadata?.planTier;
+            const activeStatuses = ['active', 'trialing', 'past_due'];
+            const isActive = activeStatuses.includes(subscription.status);
+            console.log(`[Checkout] Retrieved subscription. Plan tier: ${currentPlanTier}, Status: ${subscription.status}, Active: ${isActive}`);
 
-          if (!isActive) {
-            // Subscription exists but is not active (e.g. incomplete_expired, canceled, unpaid)
-            // Clear the stale subscription reference and reset plan to free
-            console.log(`[Checkout] Subscription ${subscription.status} — clearing stale data for user ${user.id}`);
-            await storage.updateUserStripeInfo(user.id, customerId, null);
-            if (user.plan !== 'free') {
-              await storage.updateUserPlan(user.id, 'free');
+            if (!isActive) {
+              console.log(`[Checkout] Subscription ${subscription.status} — clearing stale data for user ${user.id}`);
+              await storage.updateUserStripeInfo(user.id, customerId, null);
+              if (user.plan !== 'free') await storage.updateUserPlan(user.id, 'free');
+            } else if (currentPlanTier === planTier) {
+              if (user.plan !== planTier) await storage.updateUserPlan(user.id, planTier);
+              return res.json({
+                success: true,
+                message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
+              });
+            } else if (currentPlanTier && user.plan !== currentPlanTier) {
+              await storage.updateUserPlan(user.id, currentPlanTier);
             }
-            // Fall through to create a new checkout session
-          } else if (currentPlanTier === planTier) {
-            console.log(`[Checkout] User already has active ${planTier} plan. Returning early.`);
-            // Sync DB plan if it somehow drifted from Stripe
-            if (user.plan !== planTier) {
-              console.log(`[Checkout] DB plan (${user.plan}) out of sync with Stripe (${planTier}). Fixing.`);
-              await storage.updateUserPlan(user.id, planTier);
+          } catch (subscriptionError: any) {
+            console.log(`[Checkout] Error retrieving subscription: ${subscriptionError.message}`);
+            if (subscriptionError.message?.includes('test mode') || subscriptionError.message?.includes('live mode')) {
+              await storage.updateUserStripeInfo(user.id, customerId, null);
             }
-            return res.json({
-              success: true,
-              message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
-            });
-          } else if (currentPlanTier && user.plan !== currentPlanTier) {
-            // Active but DB plan drifted — fix it, then fall through to upgrade flow
-            console.log(`[Checkout] DB plan (${user.plan}) out of sync with active Stripe plan (${currentPlanTier}). Fixing.`);
-            await storage.updateUserPlan(user.id, currentPlanTier);
-          }
-        } catch (subscriptionError: any) {
-          console.log(`[Checkout] Error retrieving subscription: ${subscriptionError.message}`);
-          if (subscriptionError.message?.includes('test mode') || subscriptionError.message?.includes('live mode')) {
-            console.log(`Test/Live mode mismatch detected. Clearing old Stripe data for user ${user.id}.`);
-            await storage.updateUserStripeInfo(user.id, customerId, null);
           }
         }
-      } else {
-        console.log(`[Checkout] No existing subscription for user ${user.id}`);
-      }
 
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? 'https://qrsocial.io'
-        : `${req.protocol}://${req.get('host')}`;
-
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: [
-          {
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [{
             price_data: {
               currency: 'usd',
               product_data: {
@@ -1334,35 +1352,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 description: `QR Social ${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan`,
               },
               unit_amount: PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].amount,
-              recurring: {
-                interval: 'month',
-              },
+              recurring: { interval: 'month' },
             },
             quantity: 1,
+          }],
+          mode: 'subscription',
+          success_url: `${baseUrl}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${baseUrl}/pricing`,
+          metadata: { userId: user.id, planTier },
+          subscription_data: { metadata: { userId: user.id, planTier } },
+        });
+
+        return res.json({ sessionId: session.id, url: session.url });
+      }
+
+      // ── Guest user path — no account yet, Stripe collects email ──────────
+      console.log(`[Checkout] Guest requesting ${planTier} plan — creating guest checkout session`);
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        customer_creation: 'always',
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name,
+              description: `QR Social ${planTier.charAt(0).toUpperCase() + planTier.slice(1)} Plan`,
+            },
+            unit_amount: PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].amount,
+            recurring: { interval: 'month' },
           },
-        ],
+          quantity: 1,
+        }],
         mode: 'subscription',
         success_url: `${baseUrl}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/pricing`,
-        metadata: {
-          userId: user.id,
-          planTier: planTier,
-        },
-        subscription_data: {
-          metadata: {
-            userId: user.id,
-            planTier: planTier,
-          },
-        },
+        metadata: { planTier },            // no userId — webhook will create the account
+        subscription_data: { metadata: { planTier } },
       });
 
-      res.json({
-        sessionId: session.id,
-        url: session.url,
-      });
+      return res.json({ sessionId: session.id, url: session.url });
     } catch (error: any) {
       console.error('Checkout session error:', error);
       return res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Returns account info after a guest checkout completes (one-time read, then cleared)
+  app.get("/api/checkout-account", async (req, res) => {
+    const sessionId = req.query.session_id as string;
+    if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
+
+    // Check in-memory map first (populated by webhook for new accounts)
+    const entry = guestCheckoutMap.get(sessionId);
+    if (entry) {
+      if (entry.expiresAt > Date.now()) {
+        guestCheckoutMap.delete(sessionId); // one-time read
+        return res.json({ email: entry.email, tempPassword: entry.tempPassword, isNewAccount: entry.isNewAccount });
+      }
+      guestCheckoutMap.delete(sessionId);
+    }
+
+    // Fall back to Stripe session lookup (existing account or map expired)
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const email = session.customer_details?.email;
+      return res.json({ email, isNewAccount: false });
+    } catch {
+      return res.status(404).json({ error: 'Session not found' });
     }
   });
 

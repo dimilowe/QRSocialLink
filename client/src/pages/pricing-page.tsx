@@ -96,11 +96,6 @@ export default function PricingPage() {
   });
 
   const handleSelectPlan = (planId: string) => {
-    if (!user) {
-      setLocation("/auth");
-      return;
-    }
-
     createCheckoutSession.mutate(planId);
   };
 
