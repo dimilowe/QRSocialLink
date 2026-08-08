@@ -71,10 +71,10 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
           name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Email or Username</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Enter your username"
+                  placeholder="Enter your email or username"
                   {...field}
                   data-testid="input-username"
                   className="h-12"

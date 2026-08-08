@@ -67,9 +67,13 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        // Accept either username or email
+        let user = await storage.getUserByUsername(username);
         if (!user) {
-          return done(null, false, { message: "Incorrect username." });
+          user = await storage.getUserByEmail(username);
+        }
+        if (!user) {
+          return done(null, false, { message: "No account found with that username or email." });
         }
         const isValid = await crypto.compare(password, user.password);
         if (!isValid) {
