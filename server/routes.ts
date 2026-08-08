@@ -1278,14 +1278,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           const currentPlanTier = subscription.metadata?.planTier;
-          console.log(`[Checkout] Retrieved subscription. Plan tier: ${currentPlanTier}, Status: ${subscription.status}`);
+          const activeStatuses = ['active', 'trialing', 'past_due'];
+          const isActive = activeStatuses.includes(subscription.status);
+          console.log(`[Checkout] Retrieved subscription. Plan tier: ${currentPlanTier}, Status: ${subscription.status}, Active: ${isActive}`);
 
-          if (currentPlanTier === planTier) {
-            console.log(`[Checkout] User already has ${planTier} plan. Returning early.`);
+          if (!isActive) {
+            // Subscription exists but is not active (e.g. incomplete_expired, canceled, unpaid)
+            // Clear the stale subscription reference and reset plan to free
+            console.log(`[Checkout] Subscription ${subscription.status} — clearing stale data for user ${user.id}`);
+            await storage.updateUserStripeInfo(user.id, customerId, null);
+            if (user.plan !== 'free') {
+              await storage.updateUserPlan(user.id, 'free');
+            }
+            // Fall through to create a new checkout session
+          } else if (currentPlanTier === planTier) {
+            console.log(`[Checkout] User already has active ${planTier} plan. Returning early.`);
+            // Sync DB plan if it somehow drifted from Stripe
+            if (user.plan !== planTier) {
+              console.log(`[Checkout] DB plan (${user.plan}) out of sync with Stripe (${planTier}). Fixing.`);
+              await storage.updateUserPlan(user.id, planTier);
+            }
             return res.json({
               success: true,
               message: `You already have the ${PLAN_PRICES[planTier as keyof typeof PLAN_PRICES].name} plan`,
             });
+          } else if (currentPlanTier && user.plan !== currentPlanTier) {
+            // Active but DB plan drifted — fix it, then fall through to upgrade flow
+            console.log(`[Checkout] DB plan (${user.plan}) out of sync with active Stripe plan (${currentPlanTier}). Fixing.`);
+            await storage.updateUserPlan(user.id, currentPlanTier);
           }
         } catch (subscriptionError: any) {
           console.log(`[Checkout] Error retrieving subscription: ${subscriptionError.message}`);
