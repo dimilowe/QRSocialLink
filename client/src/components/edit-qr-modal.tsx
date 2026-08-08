@@ -36,7 +36,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [borderColor, setBorderColor] = useState("#8B5CF6");
   const [enableBranding, setEnableBranding] = useState(false);
-  const [topText, setTopText] = useState("qrsocial.com");
+  const [topText, setTopText] = useState("qrsocial.io");
   const [bottomText, setBottomText] = useState("Screenshot & Long-press");
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
   const [borderShape, setBorderShape] = useState<"square" | "circle" | "star" | "polaroid" | "diamond" | "heart">("square");
@@ -93,7 +93,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         setBackgroundColor(scan.backgroundColor || "#FFFFFF");
         setBorderColor(scan.borderColor || "#8B5CF6");
         setEnableBranding(scan.enableBranding || false);
-        setTopText(scan.topText || "qrsocial.com");
+        setTopText(scan.topText || "qrsocial.io");
         setBottomText(scan.bottomText || "Screenshot & Long-press");
         setBackgroundImage(scan.backgroundImage || null);
         setBorderShape((scan.borderShape as any) || "square");

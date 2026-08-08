@@ -42,7 +42,7 @@ export default function CreateQRPage() {
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [borderColor, setBorderColor] = useState("#9333EA");
-  const [topText, setTopText] = useState("qrsocial.com");
+  const [topText, setTopText] = useState("qrsocial.io");
   const [bottomText, setBottomText] = useState("long-press to open");
   const [enableBranding, setEnableBranding] = useState(true);
   const [qrImageUrl, setQrImageUrl] = useState("");
@@ -933,7 +933,7 @@ export default function CreateQRPage() {
                               id="top-text"
                               value={topText}
                               onChange={(e) => setTopText(e.target.value)}
-                              placeholder="qrsocial.com"
+                              placeholder="qrsocial.io"
                               maxLength={30}
                               data-testid="input-top-text"
                             />

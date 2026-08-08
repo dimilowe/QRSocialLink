@@ -77,7 +77,7 @@ When you make schema changes in `shared/schema.ts`:
 - List all tables: `\dt`
 
 **Production Database Access:**
-- Find production `DATABASE_URL` in: Deployments tab > qrsocial.studio > Environment Variables
+- Find production `DATABASE_URL` in: Deployments tab > qrsocial.io > Environment Variables
 - Use `psql` with the production URL to run SQL commands
 - Always test commands on development first
 
