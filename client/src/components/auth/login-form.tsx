@@ -111,6 +111,14 @@ export function LoginForm({ onSuccess }: { onSuccess?: () => void }) {
         >
           {isLoading ? "Logging in..." : "Log In"}
         </Button>
+        <div className="text-center">
+          <a
+            href="/forgot-password"
+            className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+          >
+            Forgot your password?
+          </a>
+        </div>
       </form>
     </Form>
   );

@@ -349,14 +349,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+      // Use scrypt-based comparison (same as login) — bcrypt would fail here
+      const isValidPassword = await authCrypto.compare(currentPassword, user.password);
       if (!isValidPassword) {
         return res.status(401).json({ message: "Current password is incorrect" });
       }
 
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await authCrypto.hash(newPassword);
       await storage.updatePassword(req.user.id, hashedPassword);
       
+      res.json({ message: "Password updated successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Password reset (forgot password) ──────────────────────────────────────
+  // In-memory reset token store (token → { userId, expiresAt })
+  const resetTokenMap = new Map<string, { userId: string; expiresAt: number }>();
+
+  app.post("/api/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    try {
+      const user = await storage.getUserByEmail(email);
+      // Always return 200 to avoid leaking whether the email exists
+      if (!user) return res.json({ message: "If that email exists you will receive a reset link shortly" });
+
+      const token = crypto.randomBytes(32).toString("hex");
+      resetTokenMap.set(token, { userId: user.id, expiresAt: Date.now() + 60 * 60 * 1000 }); // 1 hour
+
+      const baseUrl = process.env.NODE_ENV === "production"
+        ? "https://qrsocial.io"
+        : `${req.protocol}://${req.get("host")}`;
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey) {
+        try {
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: "QR Social <noreply@qrsocial.io>",
+              to: email,
+              subject: "Reset your QR Social password",
+              html: `
+                <div style="font-family:sans-serif;max-width:480px;margin:auto">
+                  <h2>Reset your password</h2>
+                  <p>Click the button below to set a new password. This link expires in 1 hour.</p>
+                  <a href="${resetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Reset Password</a>
+                  <p style="margin-top:24px;color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+                </div>`,
+            }),
+          });
+        } catch (emailErr) {
+          console.error("[ForgotPassword] Failed to send email:", emailErr);
+        }
+      } else {
+        // No email service — log for dev convenience
+        console.log(`[ForgotPassword] No RESEND_API_KEY configured. Reset URL: ${resetUrl}`);
+      }
+
+      res.json({ message: "If that email exists you will receive a reset link shortly" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ message: "Token and new password are required" });
+    if (newPassword.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
+
+    const entry = resetTokenMap.get(token);
+    if (!entry || entry.expiresAt < Date.now()) {
+      resetTokenMap.delete(token);
+      return res.status(400).json({ message: "Reset link is invalid or has expired" });
+    }
+
+    try {
+      const hashedPassword = await authCrypto.hash(newPassword);
+      await storage.updatePassword(entry.userId, hashedPassword);
+      resetTokenMap.delete(token);
       res.json({ message: "Password updated successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

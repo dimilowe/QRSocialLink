@@ -19,6 +19,8 @@ import CampaignDetailPage from "@/pages/campaign-detail-page";
 import OverlayGeneratorPage from "@/pages/overlay-generator-page";
 import FeedbackPage from "@/pages/feedback-page";
 import SettingsPage from "@/pages/settings-page";
+import ForgotPasswordPage from "@/pages/forgot-password-page";
+import ResetPasswordPage from "@/pages/reset-password-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
@@ -60,6 +62,8 @@ function Router() {
           }}
         </Route>
         <Route path="/" component={HomePage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/pricing" component={PricingPage} />
         <Route path="/subscribe/success" component={SubscribeSuccessPage} />
         <Route path="/feedback" component={FeedbackPage} />
