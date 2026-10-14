@@ -1,1 +1,2 @@
 - [Authentication and checkout](authentication-checkout.md) — Clerk sign-in must preserve guest checkout and existing QR ownership.
+- [Dependency compatibility](dependency-compatibility.md) — Resolve blocked transitive packages without an incidental Express major-version migration.
