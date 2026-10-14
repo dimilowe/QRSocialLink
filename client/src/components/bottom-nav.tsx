@@ -24,8 +24,8 @@ export function BottomNav() {
   const navItems = user ? authedNavItems : guestNavItems;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-card-border z-50 md:hidden">
-      <div className="flex items-center justify-around h-16 px-4">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(31,35,58,0.045)] backdrop-blur-xl md:hidden">
+      <div className="flex h-[68px] items-center justify-around px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.path;
@@ -35,18 +35,15 @@ export function BottomNav() {
               key={item.path}
               href={item.path}
               data-testid={`nav-${item.label.toLowerCase().replace(" ", "-")}`}
-            >
-              <button
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors",
+              className={cn(
+                  "flex min-w-[64px] flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs transition-colors",
                   isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-secondary text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
-              >
+            >
                 <Icon className="h-5 w-5" />
-                <span className="text-xs font-medium">{item.label}</span>
-              </button>
+                <span className="font-semibold">{item.label}</span>
             </Link>
           );
         })}

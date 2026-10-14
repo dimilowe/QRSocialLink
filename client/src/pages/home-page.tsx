@@ -9,16 +9,17 @@ export default function HomePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-6xl mx-auto px-4 py-16">
-          <div className="text-center mb-16">
-            <h1 className="text-5xl font-heading font-bold mb-4" data-testid="text-hero-title">
+      <div className="min-h-[calc(100dvh-4rem)] bg-background">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-[4.5rem]">
+          <div className="mx-auto mb-14 max-w-3xl text-center sm:mb-16">
+            <p className="mb-5 text-xs font-bold uppercase tracking-[0.19em] text-primary">QR Social · Campaign analytics</p>
+            <h1 className="mb-5 font-heading text-4xl font-semibold leading-[1.08] tracking-[-0.055em] sm:text-5xl md:text-[3.65rem]" data-testid="text-hero-title">
               QR Code Marketing Analytics
             </h1>
-            <p className="text-xl text-muted-foreground mb-8">
+            <p className="mx-auto mb-8 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               Create branded QR codes, track performance with A/B testing, and drive traffic from social media
             </p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row sm:gap-3">
               <Link href="/create">
                 <Button size="lg" data-testid="button-get-started">
                   Get Started Free
@@ -32,10 +33,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
-            <Card className="hover-elevate">
-              <CardHeader>
-                <QrCode className="h-10 w-10 text-primary mb-2" />
+          <div className="mb-12 grid gap-4 md:mb-14 md:grid-cols-3 md:gap-5">
+            <Card className="home-feature-card">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><QrCode className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Branded QR Codes</CardTitle>
               </CardHeader>
               <CardContent>
@@ -45,9 +46,9 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover-elevate">
-              <CardHeader>
-                <BarChart3 className="h-10 w-10 text-primary mb-2" />
+            <Card className="home-feature-card">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><BarChart3 className="h-5 w-5 text-primary" /></div>
                 <CardTitle>A/B Testing</CardTitle>
               </CardHeader>
               <CardContent>
@@ -57,9 +58,9 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover-elevate">
-              <CardHeader>
-                <Target className="h-10 w-10 text-primary mb-2" />
+            <Card className="home-feature-card">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><Target className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Advanced Analytics</CardTitle>
               </CardHeader>
               <CardContent>
@@ -70,10 +71,10 @@ export default function HomePage() {
             </Card>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="hover-elevate">
-              <CardHeader>
-                <Video className="h-8 w-8 text-primary mb-2" />
+          <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+            <Card className="home-feature-card">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-secondary"><Video className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Video Overlay Frames</CardTitle>
               </CardHeader>
               <CardContent>
@@ -83,9 +84,9 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover-elevate">
-              <CardHeader>
-                <TrendingUp className="h-8 w-8 text-primary mb-2" />
+            <Card className="home-feature-card">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-secondary"><TrendingUp className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Social Media Tracking</CardTitle>
               </CardHeader>
               <CardContent>
@@ -96,7 +97,7 @@ export default function HomePage() {
             </Card>
           </div>
 
-          <footer className="mt-16 py-8 border-t">
+          <footer className="mt-14 border-t border-border/80 py-8 md:mt-16">
             <div className="text-center">
               <p className="text-muted-foreground mb-4">
                 Have feedback or suggestions? We'd love to hear from you.
@@ -115,10 +116,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="min-h-[calc(100dvh-4rem)] bg-background pb-24">
+      <div className="mx-auto max-w-6xl px-4 py-9 sm:px-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-heading font-bold mb-2">
+          <h1 className="mb-2 font-heading text-3xl font-semibold tracking-[-0.045em]">
             Welcome back, {user.username}!
           </h1>
           <p className="text-muted-foreground">
@@ -126,11 +127,11 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid gap-4 md:grid-cols-3 md:gap-5">
           <Link href="/create">
-            <Card className="hover-elevate cursor-pointer h-full" data-testid="card-create-qr">
-              <CardHeader>
-                <Zap className="h-10 w-10 text-primary mb-2" />
+            <Card className="home-feature-card h-full" data-testid="card-create-qr">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><Zap className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Create QR Code</CardTitle>
               </CardHeader>
               <CardContent>
@@ -142,9 +143,9 @@ export default function HomePage() {
           </Link>
 
           <Link href="/campaigns">
-            <Card className="hover-elevate cursor-pointer h-full" data-testid="card-campaigns">
-              <CardHeader>
-                <BarChart3 className="h-10 w-10 text-primary mb-2" />
+            <Card className="home-feature-card h-full" data-testid="card-campaigns">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><BarChart3 className="h-5 w-5 text-primary" /></div>
                 <CardTitle>Campaigns</CardTitle>
               </CardHeader>
               <CardContent>
@@ -156,9 +157,9 @@ export default function HomePage() {
           </Link>
 
           <Link href="/dashboard">
-            <Card className="hover-elevate cursor-pointer h-full" data-testid="card-my-qr-codes">
-              <CardHeader>
-                <QrCode className="h-10 w-10 text-primary mb-2" />
+            <Card className="home-feature-card h-full" data-testid="card-my-qr-codes">
+              <CardHeader className="pb-3">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-secondary"><QrCode className="h-5 w-5 text-primary" /></div>
                 <CardTitle>My QR Codes</CardTitle>
               </CardHeader>
               <CardContent>
@@ -170,7 +171,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <footer className="mt-16 py-8 border-t">
+        <footer className="mt-14 border-t border-border/80 py-8">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">
               Have feedback or suggestions? We'd love to hear from you.

@@ -23,20 +23,20 @@ export function TopHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Button variant="ghost" className="hover-elevate px-3 py-2" asChild>
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-4 sm:px-6">
+        <Button variant="ghost" className="px-2.5 py-2 hover:bg-secondary/70" asChild>
           <Link href="/" data-testid="link-home">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <QrCode className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm">
+              <QrCode className="h-[18px] w-[18px] text-primary-foreground" />
             </div>
-            <span className="font-heading font-bold text-lg hidden sm:inline">
+            <span className="hidden font-heading text-[17px] font-bold tracking-[-0.04em] sm:inline">
               QR Social
             </span>
           </Link>
         </Button>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden items-center gap-1 md:flex">
           {navItems
             .filter((item) => user || item.path === "/create" || item.path === "/pricing")
             .map((item) => {
@@ -47,7 +47,7 @@ export function TopHeader() {
                   key={item.path}
                   variant={isActive ? "secondary" : "ghost"}
                   size="sm"
-                  className="gap-2"
+                  className={`gap-2 px-3 ${isActive ? "font-semibold" : "text-muted-foreground hover:text-foreground"}`}
                   asChild
                 >
                   <Link href={item.path} data-testid={`nav-desktop-${item.label.toLowerCase()}`}>
@@ -59,7 +59,7 @@ export function TopHeader() {
             })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {!user && (
             <Button variant="outline" size="sm" asChild data-testid="button-pricing">
               <Link href="/pricing">
