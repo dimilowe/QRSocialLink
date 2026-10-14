@@ -4,6 +4,13 @@ import { randomBytes } from "crypto";
 import { storage } from "./storage";
 import type { User as LocalUser } from "@shared/schema";
 
+type AuthStorage = Pick<typeof storage, "getUser" | "getUserByEmail" | "createUser">;
+type AuthDependencies = {
+  clerkClient: typeof clerkClient;
+  getAuth: typeof getAuth;
+  storage: AuthStorage;
+};
+
 declare global {
   namespace Express {
     interface User extends LocalUser {}
@@ -15,16 +22,19 @@ declare global {
 }
 
 // Clerk owns credentials and sessions. Keep local UUIDs for QR ownership/billing.
-export function setupAuth(app: Express) {
+export function setupAuth(
+  app: Express,
+  dependencies: AuthDependencies = { clerkClient, getAuth, storage },
+) {
   app.use(async (req, res, next) => {
     req.isAuthenticated = (() => !!req.user) as typeof req.isAuthenticated;
     if (!req.path.startsWith("/api/") || req.path === "/api/__clerk") return next();
     try {
-      const { userId } = getAuth(req);
+      const { userId } = dependencies.getAuth(req);
       if (!userId) return next();
-      const identity = await clerkClient.users.getUser(userId);
+      const identity = await dependencies.clerkClient.users.getUser(userId);
       let user = identity.externalId
-        ? await storage.getUser(identity.externalId)
+        ? await dependencies.storage.getUser(identity.externalId)
         : undefined;
       if (!user) {
         const emailAddress = identity.emailAddresses.find(
@@ -35,21 +45,21 @@ export function setupAuth(app: Express) {
           return res.status(403).json({ message: "Verify your email to access your account." });
         }
         const email = emailAddress.emailAddress.toLowerCase().trim();
-        user = await storage.getUserByEmail(email);
+        user = await dependencies.storage.getUserByEmail(email);
         if (!user) {
           try {
-            user = await storage.createUser({
+            user = await dependencies.storage.createUser({
               email,
               username: email,
               // Unusable local credential; local password login no longer exists.
               password: randomBytes(48).toString("hex"),
             });
           } catch (error) {
-            user = await storage.getUserByEmail(email);
+            user = await dependencies.storage.getUserByEmail(email);
             if (!user) throw error;
           }
         }
-        await clerkClient.users.updateUser(userId, { externalId: user.id });
+        await dependencies.clerkClient.users.updateUser(userId, { externalId: user.id });
       }
       req.user = user;
       next();

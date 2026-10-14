@@ -122,6 +122,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  constructor(private readonly database: typeof db = db) {}
+
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
@@ -137,7 +139,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db
+    const result = await this.database
       .select()
       .from(users)
       .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
