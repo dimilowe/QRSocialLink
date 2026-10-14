@@ -1,4 +1,6 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter } from "wouter";
+import { SignIn, SignUp } from "@clerk/react";
+import { AppClerkProvider, basePath } from "@/components/clerk-provider";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,7 +8,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import NotFound from "@/pages/not-found";
-import AuthPage from "@/pages/auth-page";
 import HomePage from "@/pages/home-page";
 import ProfilePage from "@/pages/profile-page";
 import SubscribePage from "@/pages/subscribe-page";
@@ -19,12 +20,10 @@ import CampaignDetailPage from "@/pages/campaign-detail-page";
 import OverlayGeneratorPage from "@/pages/overlay-generator-page";
 import FeedbackPage from "@/pages/feedback-page";
 import SettingsPage from "@/pages/settings-page";
-import ForgotPasswordPage from "@/pages/forgot-password-page";
-import ResetPasswordPage from "@/pages/reset-password-page";
 import { TopHeader } from "@/components/top-header";
 import { BottomNav } from "@/components/bottom-nav";
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }): JSX.Element {
+function ProtectedRoute({ component: Component }: { component: () => JSX.Element | null }): JSX.Element {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -49,21 +48,21 @@ function Router() {
     <>
       <TopHeader />
       <Switch>
-        <Route path="/auth">
-          {() => {
-            if (isLoading) {
-              return (
-                <div className="h-screen flex items-center justify-center">
-                  <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                </div>
-              );
-            }
-            return user ? <Redirect to="/" /> : <AuthPage />;
-          }}
+        <Route path="/auth"><Redirect to="/sign-in" /></Route>
+        <Route path="/sign-in/*?">
+          <div className="min-h-[85vh] flex items-center justify-center p-4">
+            <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+          </div>
         </Route>
-        <Route path="/" component={HomePage} />
-        <Route path="/forgot-password" component={ForgotPasswordPage} />
-        <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route path="/sign-up/*?">
+          <div className="min-h-[85vh] flex flex-col items-center justify-center gap-4 p-4">
+            <p className="text-sm text-muted-foreground text-center">Already purchased? Use the same email you entered at checkout.</p>
+            <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+          </div>
+        </Route>
+        <Route path="/">{user ? <Redirect to="/dashboard" /> : <HomePage />}</Route>
+        <Route path="/forgot-password"><Redirect to="/sign-in" /></Route>
+        <Route path="/reset-password"><Redirect to="/sign-in" /></Route>
         <Route path="/pricing" component={PricingPage} />
         <Route path="/subscribe/success" component={SubscribeSuccessPage} />
         <Route path="/feedback" component={FeedbackPage} />
@@ -84,6 +83,8 @@ function Router() {
 
 function App() {
   return (
+    <WouterRouter base={basePath}>
+    <AppClerkProvider>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light">
         <AuthProvider>
@@ -94,6 +95,8 @@ function App() {
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
+    </AppClerkProvider>
+    </WouterRouter>
   );
 }
 

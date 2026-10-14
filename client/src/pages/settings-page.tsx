@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Settings, CreditCard, User, Lock, ExternalLink, Copy, Check } from "lucide-react";
 import { PLAN_LIMITS } from "@shared/schema";
+import { useClerk } from "@clerk/react";
 
 const PLAN_NAMES = {
   free: "Free",
@@ -26,13 +27,11 @@ const PLAN_PRICES = {
 } as const;
 
 export default function SettingsPage() {
+  const { openUserProfile } = useClerk();
   const { user } = useAuth();
   const { toast } = useToast();
   
   const [username, setUsername] = useState(user?.username || "");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [copiedUserId, setCopiedUserId] = useState(false);
 
   const handleCopyUserId = () => {
@@ -67,33 +66,6 @@ export default function SettingsPage() {
     onError: (error: Error) => {
       toast({
         title: "Failed to update username",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updatePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const response = await apiRequest("PATCH", "/api/user/password", data);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to update password");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast({
-        title: "Password updated!",
-        description: "Your password has been successfully changed",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update password",
         description: error.message,
         variant: "destructive",
       });
@@ -140,34 +112,6 @@ export default function SettingsPage() {
       return;
     }
     updateUsernameMutation.mutate(username);
-  };
-
-  const handleUpdatePassword = () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({
-        title: "All fields required",
-        description: "Please fill in all password fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "New password and confirmation must match",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 8 characters",
-        variant: "destructive",
-      });
-      return;
-    }
-    updatePasswordMutation.mutate({ currentPassword, newPassword });
   };
 
   if (!user) {
@@ -335,54 +279,17 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <Lock className="h-5 w-5 text-muted-foreground" />
               <div>
-                <CardTitle>Password</CardTitle>
-                <CardDescription>Change your password</CardDescription>
+                <CardTitle>Sign-in &amp; Security</CardTitle>
+                <CardDescription>Manage your password and sign-in methods securely with Clerk.</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter current password"
-                data-testid="input-current-password"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (min 8 characters)"
-                data-testid="input-new-password"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                data-testid="input-confirm-password"
-              />
-            </div>
-
             <Button 
-              onClick={handleUpdatePassword}
-              disabled={updatePasswordMutation.isPending}
+              onClick={() => openUserProfile()}
               data-testid="button-update-password"
             >
-              {updatePasswordMutation.isPending ? "Updating..." : "Change Password"}
+              Manage Sign-in &amp; Security
             </Button>
           </CardContent>
         </Card>

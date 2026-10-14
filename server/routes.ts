@@ -3,12 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
-import bcrypt from "bcrypt";
 import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, insertFeedbackSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
-import { crypto as authCrypto } from "./auth";
 import fs from "fs/promises";
 import path from "path";
 import { exec } from "child_process";
@@ -39,15 +37,6 @@ const PLAN_PRICES = {
     name: "QR Social Unlimited",
   },
 } as const;
-
-// In-memory store for new accounts created during guest checkout (expires 15 min)
-interface GuestCheckoutEntry {
-  email: string;
-  tempPassword: string;
-  isNewAccount: boolean;
-  expiresAt: number;
-}
-const guestCheckoutMap = new Map<string, GuestCheckoutEntry>();
 
 function detectPlatform(referrer: string | null): string | null {
   if (!referrer) return null;
@@ -323,117 +312,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUsername(req.user.id, username.trim());
       const { password, ...safeUser } = updatedUser;
       res.json(safeUser);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.patch("/api/user/password", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const { currentPassword, newPassword } = req.body;
-      
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: "Both current and new password are required" });
-      }
-
-      if (newPassword.length < 8) {
-        return res.status(400).json({ message: "Password must be at least 8 characters" });
-      }
-
-      const user = await storage.getUser(req.user.id);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Use scrypt-based comparison (same as login) — bcrypt would fail here
-      const isValidPassword = await authCrypto.compare(currentPassword, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "Current password is incorrect" });
-      }
-
-      const hashedPassword = await authCrypto.hash(newPassword);
-      await storage.updatePassword(req.user.id, hashedPassword);
-      
-      res.json({ message: "Password updated successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // ── Password reset (forgot password) ──────────────────────────────────────
-  // In-memory reset token store (token → { userId, expiresAt })
-  const resetTokenMap = new Map<string, { userId: string; expiresAt: number }>();
-
-  app.post("/api/forgot-password", async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
-
-    try {
-      const user = await storage.getUserByEmail(email);
-      // Always return 200 to avoid leaking whether the email exists
-      if (!user) return res.json({ message: "If that email exists you will receive a reset link shortly" });
-
-      const token = crypto.randomBytes(32).toString("hex");
-      resetTokenMap.set(token, { userId: user.id, expiresAt: Date.now() + 60 * 60 * 1000 }); // 1 hour
-
-      const baseUrl = process.env.NODE_ENV === "production"
-        ? "https://qrsocial.io"
-        : `${req.protocol}://${req.get("host")}`;
-      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
-
-      const apiKey = process.env.RESEND_API_KEY;
-      if (apiKey) {
-        try {
-          await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: "QR Social <noreply@qrsocial.io>",
-              to: email,
-              subject: "Reset your QR Social password",
-              html: `
-                <div style="font-family:sans-serif;max-width:480px;margin:auto">
-                  <h2>Reset your password</h2>
-                  <p>Click the button below to set a new password. This link expires in 1 hour.</p>
-                  <a href="${resetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Reset Password</a>
-                  <p style="margin-top:24px;color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
-                </div>`,
-            }),
-          });
-        } catch (emailErr) {
-          console.error("[ForgotPassword] Failed to send email:", emailErr);
-        }
-      } else {
-        // No email service — log for dev convenience
-        console.log(`[ForgotPassword] No RESEND_API_KEY configured. Reset URL: ${resetUrl}`);
-      }
-
-      res.json({ message: "If that email exists you will receive a reset link shortly" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.post("/api/reset-password", async (req, res) => {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword) return res.status(400).json({ message: "Token and new password are required" });
-    if (newPassword.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
-
-    const entry = resetTokenMap.get(token);
-    if (!entry || entry.expiresAt < Date.now()) {
-      resetTokenMap.delete(token);
-      return res.status(400).json({ message: "Reset link is invalid or has expired" });
-    }
-
-    try {
-      const hashedPassword = await authCrypto.hash(newPassword);
-      await storage.updatePassword(entry.userId, hashedPassword);
-      resetTokenMap.delete(token);
-      res.json({ message: "Password updated successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1255,23 +1133,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Checkout completed: User ${userId} subscribed to ${planTier}`);
           } else {
             // Guest checkout — find or create account from Stripe email
-            const email = session.customer_details?.email;
+            const email = session.customer_details?.email?.trim().toLowerCase();
             if (email && customerId && subscriptionId) {
               let user = await storage.getUserByEmail(email);
-              let isNewAccount = false;
-              let tempPassword: string | null = null;
-
               if (!user) {
-                // Auto-create account using payment email
-                const rawPassword = crypto.randomBytes(6).toString('base64url'); // ~8 chars
-                const hashedPassword = await authCrypto.hash(rawPassword);
-                // Derive a clean username from the email, ensure uniqueness
-                const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16) || 'user';
-                const username = `${baseUsername}_${crypto.randomBytes(3).toString('hex')}`;
-                user = await storage.createUser({ email, username, password: hashedPassword });
-                isNewAccount = true;
-                tempPassword = rawPassword;
-                console.log(`[Checkout] Auto-created account for ${email} (username: ${username})`);
+                // Clerk will verify email ownership before linking this billing account.
+                try {
+                  user = await storage.createUser({
+                    email, username: email, password: crypto.randomBytes(48).toString("hex"),
+                  });
+                } catch (error) {
+                  user = await storage.getUserByEmail(email);
+                  if (!user) throw error;
+                }
               } else {
                 console.log(`[Checkout] Linked existing account ${user.id} to guest checkout`);
               }
@@ -1279,15 +1153,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateUserStripeInfo(user.id, customerId, subscriptionId);
               await storage.updateUserPlan(user.id, planTier);
 
-              // Store temp credentials so the success page can show them (15 min window)
-              if (isNewAccount && tempPassword) {
-                guestCheckoutMap.set(session.id, {
-                  email,
-                  tempPassword,
-                  isNewAccount: true,
-                  expiresAt: Date.now() + 15 * 60 * 1000,
-                });
-              }
             }
           }
           break;
@@ -1446,7 +1311,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Checkout] Guest requesting ${planTier} plan — creating guest checkout session`);
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        customer_creation: 'always',
         line_items: [{
           price_data: {
             currency: 'usd',
@@ -1473,26 +1337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Returns account info after a guest checkout completes (one-time read, then cleared)
+  // Confirm payment without exposing email addresses or credentials to guests.
   app.get("/api/checkout-account", async (req, res) => {
     const sessionId = req.query.session_id as string;
     if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
 
-    // Check in-memory map first (populated by webhook for new accounts)
-    const entry = guestCheckoutMap.get(sessionId);
-    if (entry) {
-      if (entry.expiresAt > Date.now()) {
-        guestCheckoutMap.delete(sessionId); // one-time read
-        return res.json({ email: entry.email, tempPassword: entry.tempPassword, isNewAccount: entry.isNewAccount });
-      }
-      guestCheckoutMap.delete(sessionId);
-    }
-
-    // Fall back to Stripe session lookup (existing account or map expired)
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      const email = session.customer_details?.email;
-      return res.json({ email, isNewAccount: false });
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({
+        paid: session.status === "complete" && session.payment_status === "paid",
+      });
     } catch {
       return res.status(404).json({ error: 'Session not found' });
     }

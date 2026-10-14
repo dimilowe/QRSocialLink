@@ -1,177 +1,67 @@
-import passport from "passport";
-import { Strategy as LocalStrategy } from "passport-local";
-import { type Express } from "express";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import type { Express } from "express";
+import { clerkClient, getAuth } from "@clerk/express";
+import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { type User as SelectUser } from "@shared/schema";
-import { pool } from "../db";
-
-const scryptAsync = promisify(scrypt);
-const crypto = {
-  hash: async (password: string) => {
-    const salt = randomBytes(16).toString("hex");
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return `${buf.toString("hex")}.${salt}`;
-  },
-  compare: async (suppliedPassword: string, storedPassword: string) => {
-    const [hashedPassword, salt] = storedPassword.split(".");
-    const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
-    const suppliedPasswordBuf = (await scryptAsync(
-      suppliedPassword,
-      salt,
-      64
-    )) as Buffer;
-    return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
-  },
-};
+import type { User as LocalUser } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    interface User extends LocalUser {}
+    interface Request {
+      user?: User;
+      isAuthenticated(): this is Request & { user: User };
+    }
   }
 }
 
+// Clerk owns credentials and sessions. Keep local UUIDs for QR ownership/billing.
 export function setupAuth(app: Express) {
-  const PgStore = connectPgSimple(session);
-  const isProduction = process.env.NODE_ENV === "production";
-  const isReplitDev = process.env.REPL_SLUG !== undefined;
-  const isSecure = isProduction || isReplitDev || process.env.REPLIT_DEPLOYMENT === "1";
-  
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "qr-social-secret-key-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: isSecure,
-      sameSite: "lax",
-    },
-    store: new PgStore({
-      pool: pool,
-      createTableIfMissing: true,
-    }),
-  };
-  
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[Auth] Session config - secure: ${isSecure}, sameSite: lax, isReplitDev: ${isReplitDev}`);
-  }
-
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        // Accept either username or email
-        let user = await storage.getUserByUsername(username);
-        if (!user) {
-          user = await storage.getUserByEmail(username);
-        }
-        if (!user) {
-          return done(null, false, { message: "No account found with that username or email." });
-        }
-        const isValid = await crypto.compare(password, user.password);
-        if (!isValid) {
-          return done(null, false, { message: "Incorrect password." });
-        }
-        return done(null, user);
-      } catch (err) {
-        return done(err);
-      }
-    })
-  );
-
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: string, done) => {
+  app.use(async (req, res, next) => {
+    req.isAuthenticated = (() => !!req.user) as typeof req.isAuthenticated;
+    if (!req.path.startsWith("/api/") || req.path === "/api/__clerk") return next();
     try {
-      const user = await storage.getUser(id);
-      done(null, user);
-    } catch (err) {
-      done(err);
-    }
-  });
-
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      const { email, username, password } = req.body;
-
-      const existingEmail = await storage.getUserByEmail(email);
-      if (existingEmail) {
-        return res.status(400).send({ message: "Email already exists" });
-      }
-
-      const existingUsername = await storage.getUserByUsername(username);
-      if (existingUsername) {
-        return res.status(400).send({ message: "Username already exists" });
-      }
-
-      const hashedPassword = await crypto.hash(password);
-      const user = await storage.createUser({
-        email,
-        username,
-        password: hashedPassword,
-      });
-
-      req.login(user, (err) => {
-        if (err) {
-          return next(err);
-        }
-        const { password: _, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  });
-
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: Express.User, info: any) => {
-      if (err) {
-        return next(err);
-      }
-
+      const { userId } = getAuth(req);
+      if (!userId) return next();
+      const identity = await clerkClient.users.getUser(userId);
+      let user = identity.externalId
+        ? await storage.getUser(identity.externalId)
+        : undefined;
       if (!user) {
-        return res.status(400).send({
-          message: info.message ?? "Login failed",
-        });
-      }
-
-      req.login(user, (err) => {
-        if (err) {
-          return next(err);
+        const emailAddress = identity.emailAddresses.find(
+          (email) => email.id === identity.primaryEmailAddressId &&
+            email.verification?.status === "verified",
+        );
+        if (!emailAddress) {
+          return res.status(403).json({ message: "Verify your email to access your account." });
         }
-
-        const { password: _, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
-      });
-    })(req, res, next);
-  });
-
-  app.post("/api/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).send({ message: "Logout failed" });
+        const email = emailAddress.emailAddress.toLowerCase().trim();
+        user = await storage.getUserByEmail(email);
+        if (!user) {
+          try {
+            user = await storage.createUser({
+              email,
+              username: email,
+              // Unusable local credential; local password login no longer exists.
+              password: randomBytes(48).toString("hex"),
+            });
+          } catch (error) {
+            user = await storage.getUserByEmail(email);
+            if (!user) throw error;
+          }
+        }
+        await clerkClient.users.updateUser(userId, { externalId: user.id });
       }
-      res.json({ message: "Logged out successfully" });
-    });
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error("[Auth] Unable to resolve Clerk account");
+      res.status(503).json({ message: "Unable to load your account. Please try again." });
+    }
   });
 
   app.get("/api/user", (req, res) => {
-    if (req.isAuthenticated()) {
-      const { password: _, ...userWithoutPassword } = req.user!;
-      console.log(`[API] Returning user data: id=${userWithoutPassword.id}, plan=${userWithoutPassword.plan}`);
-      return res.json(userWithoutPassword);
-    }
-    res.status(401).send({ message: "Not authenticated" });
+    if (!req.user) return res.sendStatus(401);
+    const { password, ...user } = req.user;
+    res.json(user);
   });
 }
-
-export { crypto };

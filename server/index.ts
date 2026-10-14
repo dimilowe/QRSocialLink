@@ -6,15 +6,25 @@ import { OverlayProcessor } from "./overlay-processor";
 import { storage } from "./storage";
 import { runMigrations } from "./migrate";
 import { mirrorYesterdayAnalyticsToVcmOs } from "./services/analyticsAggregation";
+import { clerkMiddleware } from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
+import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from "./middlewares/clerkProxyMiddleware";
 
 const app = express();
 
 app.set('trust proxy', 1);
 
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use("/api/webhooks/stripe", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 
+app.use(clerkMiddleware((req) => ({
+  publishableKey: publishableKeyFromHost(
+    getClerkProxyHost(req) ?? "",
+    process.env.CLERK_PUBLISHABLE_KEY,
+  ),
+})));
 setupAuth(app);
 
 app.use((req, res, next) => {

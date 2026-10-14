@@ -140,8 +140,11 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select()
       .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+      .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
+      .limit(2);
+    if (result.length > 1) {
+      throw new Error("Multiple accounts share this email. Account linking requires review.");
+    }
     return result[0];
   }
 

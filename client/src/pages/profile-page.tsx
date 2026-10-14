@@ -66,7 +66,6 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try {
-      await apiRequest("POST", "/api/logout", {});
       logout();
       setLocation("/auth");
     } catch (error) {

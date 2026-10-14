@@ -1,0 +1,1 @@
+- [Authentication and checkout](authentication-checkout.md) — Clerk sign-in must preserve guest checkout and existing QR ownership.
