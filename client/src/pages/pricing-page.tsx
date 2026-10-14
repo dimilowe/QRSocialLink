@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Crown, Building2, Check, Zap, PartyPopper } from "lucide-react";
+import { Sparkles, Crown, Building2, Check, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -102,25 +102,6 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-8">
       <div className="max-w-6xl mx-auto px-4 py-12">
-        <Card className="mb-8 p-6 border-2 border-primary bg-primary/5" data-testid="card-beta-banner">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-center md:text-left">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-full bg-primary/10">
-                <PartyPopper className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold font-heading">Beta Testing Period</h2>
-                <p className="text-muted-foreground">
-                  Everything is <span className="text-primary font-semibold">100% FREE</span> right now! No payment required.
-                </p>
-              </div>
-            </div>
-            <Badge variant="default" className="text-base px-4 py-2">
-              All Features Unlocked
-            </Badge>
-          </div>
-        </Card>
-
         <div className="text-center mb-12">
           <Badge className="mb-4" variant="secondary" data-testid="badge-pricing">
             <Zap className="w-3 h-3 mr-1" />
@@ -130,7 +111,7 @@ export default function PricingPage() {
             Choose Your Plan
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            During our beta, all features are free! These are our future pricing plans.
+            Choose the monthly plan that fits your QR campaigns. Cancel anytime.
           </p>
         </div>
 
@@ -203,9 +184,9 @@ export default function PricingPage() {
           <h2 className="text-2xl font-bold mb-6 text-center font-heading">Frequently Asked Questions</h2>
           <div className="space-y-4">
             <Card className="p-6">
-              <h3 className="font-semibold mb-2">Is QR Social really free right now?</h3>
+              <h3 className="font-semibold mb-2">How does billing work?</h3>
               <p className="text-muted-foreground text-sm">
-                Yes! During our beta testing period, all features are completely free - unlimited QR codes, analytics, downloads, and more. No credit card required.
+                Starter is $10/month, Pro is $30/month, and Unlimited is $99/month. Your selected plan is billed monthly through Stripe.
               </p>
             </Card>
             <Card className="p-6">
