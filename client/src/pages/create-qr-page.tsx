@@ -1,3 +1,6 @@
+import { QRDesignControls } from "@/components/qr-design-controls";
+import { type ModuleStyle, type EyeStyle } from "@/lib/qr-design";
+import { generateBrandedQR } from "@/lib/qr-generator";
 import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -39,12 +42,15 @@ export default function CreateQRPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
-  const [foregroundColor, setForegroundColor] = useState("#000000");
-  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
-  const [borderColor, setBorderColor] = useState("#9333EA");
+  const [moduleStyle, setModuleStyle] = useState<ModuleStyle>("rounded");
+  const [eyeStyle, setEyeStyle] = useState<EyeStyle>("rounded");
+  const [eyeColor, setEyeColor] = useState("#182333");
+  const [foregroundColor, setForegroundColor] = useState("#182333");
+  const [backgroundColor, setBackgroundColor] = useState("#FAF8F3");
+  const [borderColor, setBorderColor] = useState("#FAF8F3");
   const [topText, setTopText] = useState("qrsocial.io");
   const [bottomText, setBottomText] = useState("long-press to open");
-  const [enableBranding, setEnableBranding] = useState(true);
+  const [enableBranding, setEnableBranding] = useState(false);
   const [qrImageUrl, setQrImageUrl] = useState("");
   const [qrOverlayUrl, setQrOverlayUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -105,366 +111,20 @@ export default function CreateQRPage() {
     setBackgroundImageType(null);
   };
 
-  const getShapeDimensions = (shape: typeof borderShape) => {
-    const borderSize = 60;
-    const qrSize = 400;
-    
-    if (shape === "polaroid") {
-      return {
-        width: qrSize + borderSize * 2,
-        height: qrSize + borderSize * 2 + 100,
-        qrX: borderSize,
-        qrY: borderSize,
-        qrSize,
-        borderSize,
-      };
-    }
-    
-    return {
-      width: qrSize + borderSize * 2,
-      height: qrSize + borderSize * 2,
-      qrX: borderSize,
-      qrY: borderSize,
-      qrSize,
-      borderSize,
-    };
-  };
-
-  const createShapePath = (ctx: CanvasRenderingContext2D, shape: typeof borderShape, width: number, height: number) => {
-    ctx.beginPath();
-    
-    const centerX = width / 2;
-    const centerY = shape === "polaroid" ? (height - 100) / 2 : height / 2;
-    
-    switch (shape) {
-      case "circle":
-        const radius = Math.min(width, height) / 2;
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        break;
-        
-      case "star":
-        const outerRadius = Math.min(width, height) / 2;
-        const innerRadius = outerRadius * 0.4;
-        const spikes = 5;
-        
-        for (let i = 0; i < spikes * 2; i++) {
-          const radius = i % 2 === 0 ? outerRadius : innerRadius;
-          const angle = (Math.PI * i) / spikes - Math.PI / 2;
-          const x = centerX + Math.cos(angle) * radius;
-          const y = centerY + Math.sin(angle) * radius;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        break;
-        
-      case "heart":
-        const heartSize = Math.min(width, height) / 2.2;
-        const topY = centerY - heartSize * 0.3;
-        
-        ctx.moveTo(centerX, topY + heartSize);
-        ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
-        ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
-        ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
-        ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
-        ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
-        ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
-        ctx.closePath();
-        break;
-        
-      case "diamond":
-        const halfWidth = width / 2;
-        const halfHeight = height / 2;
-        ctx.moveTo(centerX, centerY - halfHeight);
-        ctx.lineTo(centerX + halfWidth, centerY);
-        ctx.lineTo(centerX, centerY + halfHeight);
-        ctx.lineTo(centerX - halfWidth, centerY);
-        ctx.closePath();
-        break;
-        
-      case "polaroid":
-        // Polaroid includes the full rectangle with footer area
-        ctx.rect(0, 0, width, height);
-        break;
-      case "square":
-      default:
-        ctx.rect(0, 0, width, height);
-        break;
-    }
-  };
-
-  const generateBrandedQR = async (params: {
-    targetUrl: string;
-    foregroundColor: string;
-    backgroundColor: string;
-    borderColor: string;
-    topText: string;
-    bottomText: string;
-    enableBranding: boolean;
-    backgroundImage: string | null;
-    backgroundImageType: string | null;
-    imageFit: "cover" | "contain" | "stretch";
-    borderShape: "square" | "circle" | "star" | "polaroid" | "diamond" | "heart";
-    polaroidText: string;
-    canvasFillEnabled: boolean;
-    canvasFillColor: string;
-  }): Promise<{ qrImageUrl: string; qrOverlayUrl?: string }> => {
-    const {
-      targetUrl,
-      foregroundColor,
-      backgroundColor,
-      borderColor,
-      topText,
-      bottomText,
-      enableBranding,
-      backgroundImage,
-      backgroundImageType,
-      imageFit,
-      borderShape,
-      polaroidText,
-      canvasFillEnabled,
-      canvasFillColor,
-    } = params;
-
-    const QRCode = (await import("qrcode")).default;
-    
-    const qrDataUrl = await QRCode.toDataURL(targetUrl, {
-      color: {
-        dark: foregroundColor,
-        light: backgroundColor,
-      },
-      width: 400,
-      margin: 1,
-    });
-
-    if (!enableBranding && !backgroundImage && borderShape === "square") {
-      return { qrImageUrl: qrDataUrl };
-    }
-
-    const dims = getShapeDimensions(borderShape);
-    const { width: totalWidth, height: totalHeight, qrX, qrY, qrSize } = dims;
-
-    const drawImageOnCanvas = (ctx: CanvasRenderingContext2D, image: HTMLImageElement | ImageBitmap, imgWidth: number, imgHeight: number, canvasWidth: number, canvasHeight: number) => {
-      if (imageFit === "cover") {
-        const aspectRatio = imgWidth / imgHeight;
-        const canvasAspectRatio = canvasWidth / canvasHeight;
-        let drawWidth, drawHeight, offsetX, offsetY;
-
-        if (aspectRatio > canvasAspectRatio) {
-          drawHeight = canvasHeight;
-          drawWidth = drawHeight * aspectRatio;
-          offsetX = (canvasWidth - drawWidth) / 2;
-          offsetY = 0;
-        } else {
-          drawWidth = canvasWidth;
-          drawHeight = drawWidth / aspectRatio;
-          offsetX = 0;
-          offsetY = (canvasHeight - drawHeight) / 2;
-        }
-        ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
-      } else if (imageFit === "contain") {
-        const aspectRatio = imgWidth / imgHeight;
-        const canvasAspectRatio = canvasWidth / canvasHeight;
-        let drawWidth, drawHeight, offsetX, offsetY;
-
-        if (aspectRatio > canvasAspectRatio) {
-          drawWidth = canvasWidth;
-          drawHeight = drawWidth / aspectRatio;
-          offsetX = 0;
-          offsetY = (canvasHeight - drawHeight) / 2;
-        } else {
-          drawHeight = canvasHeight;
-          drawWidth = drawHeight * aspectRatio;
-          offsetX = (canvasWidth - drawWidth) / 2;
-          offsetY = 0;
-        }
-        ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
-      } else {
-        ctx.drawImage(image, 0, 0, canvasWidth, canvasHeight);
-      }
-    };
-
-    const qrImage = new Image();
-    await new Promise((resolve) => {
-      qrImage.onload = resolve;
-      qrImage.src = qrDataUrl;
-    });
-
-    const drawQROverlay = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
-      ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-
-      const isPolaroid = borderShape === "polaroid";
-
-      if (enableBranding && !isPolaroid) {
-        if (topText) {
-          ctx.fillStyle = "#FFFFFF";
-          ctx.strokeStyle = "#000000";
-          ctx.lineWidth = 3;
-          ctx.font = "bold 24px Inter, sans-serif";
-          ctx.textAlign = "center";
-          ctx.strokeText(topText, canvasWidth / 2, 35);
-          ctx.fillText(topText, canvasWidth / 2, 35);
-        }
-
-        if (bottomText) {
-          ctx.fillStyle = "#FFFFFF";
-          ctx.strokeStyle = "#000000";
-          ctx.lineWidth = 3;
-          ctx.font = "16px Inter, sans-serif";
-          ctx.textAlign = "center";
-          const bottomY = isPolaroid ? canvasHeight - 125 : canvasHeight - 25;
-          ctx.strokeText(bottomText, canvasWidth / 2, bottomY);
-          ctx.fillText(bottomText, canvasWidth / 2, bottomY);
-        }
-      }
-
-      if (isPolaroid && polaroidText) {
-        ctx.fillStyle = "#000000";
-        ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(polaroidText, canvasWidth / 2, canvasHeight - 50);
-      }
-
-      const watermarkY = isPolaroid ? canvasHeight - 10 : canvasHeight - 10;
-      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-      ctx.font = "10px Inter, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText("Made with QR Social", canvasWidth - 10, watermarkY);
-    };
-
-    if (backgroundImage && backgroundImageType === "image/gif") {
-      const overlayCanvas = document.createElement("canvas");
-      const overlayCtx = overlayCanvas.getContext("2d");
-      if (!overlayCtx) throw new Error("Canvas not supported");
-
-      overlayCanvas.width = totalWidth;
-      overlayCanvas.height = totalHeight;
-
-      drawQROverlay(overlayCtx, totalWidth, totalHeight);
-
-      const transparentQRUrl = overlayCanvas.toDataURL("image/png");
-
-      const compositeCanvas = document.createElement("canvas");
-      const compositeCtx = compositeCanvas.getContext("2d");
-      if (!compositeCtx) throw new Error("Canvas not supported");
-
-      compositeCanvas.width = totalWidth;
-      compositeCanvas.height = totalHeight;
-
-      const compositeDataUrl = await new Promise<string>((resolve) => {
-        const bgImg = new Image();
-        bgImg.onload = () => {
-          if (canvasFillEnabled) {
-            compositeCtx.fillStyle = canvasFillColor;
-            compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-          } else {
-            compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-          }
-          
-          compositeCtx.save();
-          createShapePath(compositeCtx, borderShape, compositeCanvas.width, compositeCanvas.height);
-          compositeCtx.clip();
-          drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, compositeCanvas.width, compositeCanvas.height);
-          compositeCtx.restore();
-          
-          compositeCtx.globalCompositeOperation = "destination-out";
-          compositeCtx.fillRect(qrX, qrY, qrSize, qrSize);
-          compositeCtx.globalCompositeOperation = "source-over";
-          
-          compositeCtx.fillStyle = "#FFFFFF";
-          compositeCtx.fillRect(qrX, qrY, qrSize, qrSize);
-          
-          drawQROverlay(compositeCtx, compositeCanvas.width, compositeCanvas.height);
-
-          resolve(compositeCanvas.toDataURL("image/png"));
-        };
-        bgImg.src = backgroundImage;
-      });
-
-      return { qrImageUrl: compositeDataUrl, qrOverlayUrl: transparentQRUrl };
-    } else if (backgroundImage) {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas not supported");
-
-      canvas.width = totalWidth;
-      canvas.height = totalHeight;
-
-      const brandedDataUrl = await new Promise<string>((resolve) => {
-        const bgImg = new Image();
-        bgImg.onload = () => {
-          if (canvasFillEnabled) {
-            ctx.fillStyle = canvasFillColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-          }
-          
-          ctx.save();
-          createShapePath(ctx, borderShape, canvas.width, canvas.height);
-          ctx.clip();
-          drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, canvas.width, canvas.height);
-          ctx.restore();
-          
-          ctx.globalCompositeOperation = "destination-out";
-          ctx.fillRect(qrX, qrY, qrSize, qrSize);
-          ctx.globalCompositeOperation = "source-over";
-          
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(qrX, qrY, qrSize, qrSize);
-          
-          drawQROverlay(ctx, canvas.width, canvas.height);
-
-          resolve(canvas.toDataURL("image/png"));
-        };
-        bgImg.src = backgroundImage;
-      });
-
-      return { qrImageUrl: brandedDataUrl };
-    } else {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas not supported");
-
-      canvas.width = totalWidth;
-      canvas.height = totalHeight;
-
-      if (canvasFillEnabled) {
-        ctx.fillStyle = canvasFillColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      
-      createShapePath(ctx, borderShape, canvas.width, canvas.height);
-      ctx.fillStyle = borderColor;
-      ctx.fill();
-      
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fillRect(qrX, qrY, qrSize, qrSize);
-      ctx.globalCompositeOperation = "source-over";
-      
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(qrX, qrY, qrSize, qrSize);
-      
-      drawQROverlay(ctx, canvas.width, canvas.height);
-
-      const brandedDataUrl = canvas.toDataURL("image/png");
-      return { qrImageUrl: brandedDataUrl };
-    }
-  };
-
   useEffect(() => {
     if (!url) {
       setQrImageUrl("");
       return;
     }
 
+    let cancelled = false;
+    setIsGenerating(true);
     const generateQR = async () => {
       setIsGenerating(true);
       try {
         const result = await generateBrandedQR({
           targetUrl: url,
+          moduleStyle, eyeStyle, eyeColor,
           foregroundColor,
           backgroundColor,
           borderColor,
@@ -480,12 +140,13 @@ export default function CreateQRPage() {
           canvasFillColor,
         });
 
+        if (cancelled) return;
         setQrImageUrl(result.qrImageUrl);
-        if (result.qrOverlayUrl) {
-          setQrOverlayUrl(result.qrOverlayUrl);
-        }
+        setQrOverlayUrl(result.qrOverlayUrl || "");
         setIsGenerating(false);
       } catch (err) {
+        if (cancelled) return;
+        setQrImageUrl("");
         console.error("QR generation error:", err);
         setIsGenerating(false);
       }
@@ -493,12 +154,13 @@ export default function CreateQRPage() {
 
     const debounce = setTimeout(generateQR, 300);
     return () => {
+      cancelled = true;
       clearTimeout(debounce);
       if (giflerInstance && giflerInstance.stop) {
         giflerInstance.stop();
       }
     };
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor]);
+  }, [moduleStyle, eyeStyle, eyeColor, url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, backgroundImageType, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor]);
 
   const createQRMutation = useMutation({
     mutationFn: async (data: CreateQRFormData) => {
@@ -516,8 +178,9 @@ export default function CreateQRPage() {
         campaignId: enableABTesting ? selectedCampaignId : null,
         topText: enableBranding ? topText : null,
         bottomText: enableBranding ? bottomText : null,
-        borderColor: enableBranding ? borderColor : null,
+        borderColor,
         enableBranding,
+        moduleStyle, eyeStyle, eyeColor,
         foregroundColor,
         backgroundColor,
         backgroundImage: backgroundImage || null,
@@ -546,6 +209,7 @@ export default function CreateQRPage() {
           
           const brandedTrackingQR = await generateBrandedQR({
             targetUrl: trackingUrl,
+            moduleStyle, eyeStyle, eyeColor,
             foregroundColor,
             backgroundColor,
             borderColor,
@@ -827,6 +491,16 @@ export default function CreateQRPage() {
                     </TabsList>
 
                     <TabsContent value="qr" className="space-y-4 mt-4">
+                      <QRDesignControls moduleStyle={moduleStyle} eyeStyle={eyeStyle} eyeColor={eyeColor}
+                        foregroundColor={foregroundColor} backgroundColor={backgroundColor}
+                        onModuleStyle={setModuleStyle} onEyeStyle={setEyeStyle} onEyeColor={setEyeColor} onBackgroundColor={setBackgroundColor}
+                        onPreset={(preset) => {
+                          setModuleStyle(preset.moduleStyle); setEyeStyle(preset.eyeStyle);
+                          setEyeColor(preset.accent); setForegroundColor(preset.foreground);
+                          setBackgroundColor(preset.background); setBorderColor(preset.background);
+                          setBackgroundImage(null); setBackgroundImageType(null); setBorderShape("square"); setEnableBranding(false);
+                        }} />
+
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <FormLabel htmlFor="foreground">Foreground</FormLabel>
@@ -848,7 +522,7 @@ export default function CreateQRPage() {
                             <input
                               id="background"
                               type="color"
-                              value={backgroundColor}
+                              value={backgroundColor === "transparent" ? "#FFFFFF" : backgroundColor}
                               onChange={(e) => setBackgroundColor(e.target.value)}
                               className="h-10 w-full rounded-md border cursor-pointer"
                               data-testid="input-background-color"
@@ -1081,7 +755,7 @@ export default function CreateQRPage() {
                 <Button
                   type="submit"
                   className="w-full h-12"
-                  disabled={!isValidUrl(url) || !qrImageUrl || createQRMutation.isPending}
+                  disabled={isGenerating || !isValidUrl(url) || !qrImageUrl || createQRMutation.isPending}
                   data-testid="button-create-qr"
                 >
                   <Sparkles className="h-5 w-5 mr-2" />
@@ -1142,6 +816,7 @@ export default function CreateQRPage() {
                     variant="outline"
                     className="w-full"
                     onClick={handleDownloadQR}
+                    disabled={isGenerating}
                     data-testid="button-download-qr"
                   >
                     <Download className="h-4 w-4 mr-2" />

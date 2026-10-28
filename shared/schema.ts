@@ -78,6 +78,9 @@ export const scans = pgTable("scans", {
   bottomText: text("bottom_text"),
   borderColor: text("border_color"),
   enableBranding: boolean("enable_branding").default(false),
+  moduleStyle: text("module_style").$type<"square" | "rounded" | "dots">().notNull().default("square"),
+  eyeStyle: text("eye_style").$type<"square" | "rounded" | "circle">().notNull().default("square"),
+  eyeColor: text("eye_color"),
   foregroundColor: text("foreground_color"),
   backgroundColor: text("background_color"),
   backgroundImage: text("background_image"),
@@ -232,7 +235,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   stripeSubscriptionId: true,
 });
 
-export const insertScanSchema = createInsertSchema(scans).omit({
+export const insertScanSchema = createInsertSchema(scans, {
+  moduleStyle: z.enum(["square", "rounded", "dots"]),
+  eyeStyle: z.enum(["square", "rounded", "circle"]),
+  eyeColor: z.string().regex(/^#[0-9a-f]{6}$/i).nullable(),
+}).omit({
   id: true,
   createdAt: true,
 });

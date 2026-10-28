@@ -1,3 +1,6 @@
+import { QRDesignControls } from "@/components/qr-design-controls";
+import { type ModuleStyle, type EyeStyle } from "@/lib/qr-design";
+import { generateBrandedQR } from "@/lib/qr-generator";
 import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
@@ -32,6 +35,9 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
   const { user } = useAuth();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [moduleStyle, setModuleStyle] = useState<ModuleStyle>("rounded");
+  const [eyeStyle, setEyeStyle] = useState<EyeStyle>("rounded");
+  const [eyeColor, setEyeColor] = useState("#182333");
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [borderColor, setBorderColor] = useState("#8B5CF6");
@@ -89,6 +95,9 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
         
         setUrl(initialUrl);
         setTitle(scan.title || "");
+        setModuleStyle((scan.moduleStyle as ModuleStyle) || "square");
+        setEyeStyle((scan.eyeStyle as EyeStyle) || "square");
+        setEyeColor(scan.eyeColor || scan.foregroundColor || "#000000");
         setForegroundColor(scan.foregroundColor || "#000000");
         setBackgroundColor(scan.backgroundColor || "#FFFFFF");
         setBorderColor(scan.borderColor || "#8B5CF6");
@@ -136,322 +145,31 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       return;
     }
 
+    let cancelled = false;
+    setIsGenerating(true);
     const generatePreview = async () => {
       setIsGenerating(true);
       try {
-        const QRCode = (await import("qrcode")).default;
-        
-        const useTransparentBg = borderShape !== "square" && borderShape !== "polaroid";
-        const qrDataUrl = await QRCode.toDataURL(url, {
-          color: {
-            dark: foregroundColor,
-            light: useTransparentBg ? "#00000000" : backgroundColor,
-          },
-          width: 400,
-          margin: 1,
+        const result = await generateBrandedQR({
+          targetUrl: scan?.dynamicSlug ? `${window.location.origin}/q/${scan.dynamicSlug}` : url, foregroundColor, backgroundColor, borderColor,
+          topText, bottomText, enableBranding, backgroundImage,
+          backgroundImageType: backgroundImage?.startsWith("data:image/gif") ? "image/gif" : null,
+          imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor,
+          moduleStyle, eyeStyle, eyeColor,
         });
-
-        if (!enableBranding && !backgroundImage && borderShape === "square") {
-          setQrPreviewUrl(qrDataUrl);
-          setIsGenerating(false);
-          return;
-        }
-
-        const borderSize = 60;
-        const qrSize = 400;
-        const totalWidth = qrSize + borderSize * 2;
-        const totalHeight = borderShape === "polaroid" ? qrSize + borderSize * 2 + 100 : qrSize + borderSize * 2;
-        const qrX = borderSize;
-        const qrY = borderSize;
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas not supported");
-
-        canvas.width = totalWidth;
-        canvas.height = totalHeight;
-
-        const qrImage = new Image();
-        await new Promise((resolve) => {
-          qrImage.onload = resolve;
-          qrImage.src = qrDataUrl;
-        });
-
-        const drawQR = () => {
-          // Fill canvas with background color or keep transparent
-          if (canvasFillEnabled) {
-            ctx.fillStyle = canvasFillColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          } else {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-          }
-          
-          // Draw shaped border filled with solid color
-          ctx.beginPath();
-          const centerX = canvas.width / 2;
-          const centerY = borderShape === "polaroid" ? (canvas.height - 100) / 2 : canvas.height / 2;
-          
-          switch (borderShape) {
-            case "circle":
-              ctx.arc(centerX, centerY, Math.min(canvas.width, canvas.height) / 2, 0, Math.PI * 2);
-              break;
-            case "star":
-              const outerRadius = Math.min(canvas.width, canvas.height) / 2;
-              const innerRadius = outerRadius * 0.4;
-              for (let i = 0; i < 10; i++) {
-                const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                const angle = (Math.PI * i) / 5 - Math.PI / 2;
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-              }
-              ctx.closePath();
-              break;
-            case "heart":
-              const heartSize = Math.min(canvas.width, canvas.height) / 2.2;
-              const topY = centerY - heartSize * 0.3;
-              ctx.moveTo(centerX, topY + heartSize);
-              ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
-              ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
-              ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
-              ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
-              ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
-              ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
-              ctx.closePath();
-              break;
-            case "diamond":
-              ctx.moveTo(centerX, centerY - canvas.height / 2);
-              ctx.lineTo(centerX + canvas.width / 2, centerY);
-              ctx.lineTo(centerX, centerY + canvas.height / 2);
-              ctx.lineTo(centerX - canvas.width / 2, centerY);
-              ctx.closePath();
-              break;
-            case "polaroid":
-              // Polaroid includes the full rectangle with footer area
-              ctx.rect(0, 0, canvas.width, canvas.height);
-              break;
-            default:
-              // Square shape
-              ctx.rect(0, 0, canvas.width, canvas.height);
-          }
-          ctx.fillStyle = borderColor;
-          ctx.fill();
-          
-          // Punch out a square hole for QR code
-          ctx.globalCompositeOperation = "destination-out";
-          ctx.fillRect(qrX, qrY, qrSize, qrSize);
-          ctx.globalCompositeOperation = "source-over";
-          
-          // Fill the punched hole with white background for clean QR area
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(qrX, qrY, qrSize, qrSize);
-          
-          // Draw QR code in the clean white square
-          ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-
-          // Draw branding
-          if (enableBranding && borderShape !== "polaroid") {
-            if (topText) {
-              ctx.fillStyle = "#FFFFFF";
-              ctx.strokeStyle = "#000000";
-              ctx.lineWidth = 3;
-              ctx.font = "bold 24px Inter, sans-serif";
-              ctx.textAlign = "center";
-              ctx.strokeText(topText, canvas.width / 2, 35);
-              ctx.fillText(topText, canvas.width / 2, 35);
-            }
-            if (bottomText) {
-              ctx.fillStyle = "#FFFFFF";
-              ctx.strokeStyle = "#000000";
-              ctx.lineWidth = 3;
-              ctx.font = "16px Inter, sans-serif";
-              ctx.textAlign = "center";
-              const bottomY = canvas.height - 25;
-              ctx.strokeText(bottomText, canvas.width / 2, bottomY);
-              ctx.fillText(bottomText, canvas.width / 2, bottomY);
-            }
-          }
-
-          if (borderShape === "polaroid" && polaroidText) {
-            ctx.fillStyle = "#000000";
-            ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(polaroidText, canvas.width / 2, canvas.height - 50);
-          }
-
-          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-          ctx.font = "10px Inter, sans-serif";
-          ctx.textAlign = "right";
-          ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
-          
-          setQrPreviewUrl(canvas.toDataURL("image/png"));
-          setIsGenerating(false);
-        };
-
-        if (backgroundImage) {
-          const bgImg = new Image();
-          bgImg.onload = () => {
-            // Fill canvas with background color or keep transparent
-            if (canvasFillEnabled) {
-              ctx.fillStyle = canvasFillColor;
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-            } else {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-            
-            // Draw shaped background image
-            ctx.save();
-            ctx.beginPath();
-            const centerX = canvas.width / 2;
-            const centerY = borderShape === "polaroid" ? (canvas.height - 100) / 2 : canvas.height / 2;
-            
-            switch (borderShape) {
-              case "circle":
-                ctx.arc(centerX, centerY, Math.min(canvas.width, canvas.height) / 2, 0, Math.PI * 2);
-                break;
-              case "star":
-                const outerRadius = Math.min(canvas.width, canvas.height) / 2;
-                const innerRadius = outerRadius * 0.4;
-                for (let i = 0; i < 10; i++) {
-                  const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                  const angle = (Math.PI * i) / 5 - Math.PI / 2;
-                  const x = centerX + Math.cos(angle) * radius;
-                  const y = centerY + Math.sin(angle) * radius;
-                  if (i === 0) ctx.moveTo(x, y);
-                  else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
-                break;
-              case "heart":
-                const heartSize = Math.min(canvas.width, canvas.height) / 2.2;
-                const topY = centerY - heartSize * 0.3;
-                ctx.moveTo(centerX, topY + heartSize);
-                ctx.bezierCurveTo(centerX, topY + heartSize * 0.6, centerX - heartSize * 1.1, topY, centerX - heartSize * 0.7, topY);
-                ctx.bezierCurveTo(centerX - heartSize * 1.3, topY, centerX - heartSize * 1.3, topY + heartSize * 0.6, centerX - heartSize * 1.3, topY + heartSize * 0.6);
-                ctx.bezierCurveTo(centerX - heartSize * 1.3, topY + heartSize * 1.2, centerX, topY + heartSize * 1.8, centerX, topY + heartSize * 2.2);
-                ctx.bezierCurveTo(centerX, topY + heartSize * 1.8, centerX + heartSize * 1.3, topY + heartSize * 1.2, centerX + heartSize * 1.3, topY + heartSize * 0.6);
-                ctx.bezierCurveTo(centerX + heartSize * 1.3, topY + heartSize * 0.6, centerX + heartSize * 1.3, topY, centerX + heartSize * 0.7, topY);
-                ctx.bezierCurveTo(centerX + heartSize * 1.1, topY, centerX, topY + heartSize * 0.6, centerX, topY + heartSize);
-                ctx.closePath();
-                break;
-              case "diamond":
-                ctx.moveTo(centerX, centerY - canvas.height / 2);
-                ctx.lineTo(centerX + canvas.width / 2, centerY);
-                ctx.lineTo(centerX, centerY + canvas.height / 2);
-                ctx.lineTo(centerX - canvas.width / 2, centerY);
-                ctx.closePath();
-                break;
-              case "polaroid":
-                // Polaroid includes the full rectangle with footer area
-                ctx.rect(0, 0, canvas.width, canvas.height);
-                break;
-              default:
-                // Square shape
-                ctx.rect(0, 0, canvas.width, canvas.height);
-            }
-            ctx.clip();
-            
-            // Draw background image within the shape
-            if (imageFit === "cover") {
-              const aspectRatio = bgImg.width / bgImg.height;
-              const canvasAspectRatio = canvas.width / canvas.height;
-              let drawWidth, drawHeight, offsetX, offsetY;
-              if (aspectRatio > canvasAspectRatio) {
-                drawHeight = canvas.height;
-                drawWidth = drawHeight * aspectRatio;
-                offsetX = (canvas.width - drawWidth) / 2;
-                offsetY = 0;
-              } else {
-                drawWidth = canvas.width;
-                drawHeight = drawWidth / aspectRatio;
-                offsetX = 0;
-                offsetY = (canvas.height - drawHeight) / 2;
-              }
-              ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
-            } else if (imageFit === "contain") {
-              const aspectRatio = bgImg.width / bgImg.height;
-              const canvasAspectRatio = canvas.width / canvas.height;
-              let drawWidth, drawHeight, offsetX, offsetY;
-              if (aspectRatio > canvasAspectRatio) {
-                drawWidth = canvas.width;
-                drawHeight = drawWidth / aspectRatio;
-                offsetX = 0;
-                offsetY = (canvas.height - drawHeight) / 2;
-              } else {
-                drawHeight = canvas.height;
-                drawWidth = drawHeight * aspectRatio;
-                offsetX = (canvas.width - drawWidth) / 2;
-                offsetY = 0;
-              }
-              ctx.drawImage(bgImg, offsetX, offsetY, drawWidth, drawHeight);
-            } else {
-              ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-            }
-            ctx.restore();
-            
-            // Punch out a square hole for QR code
-            ctx.globalCompositeOperation = "destination-out";
-            ctx.fillRect(qrX, qrY, qrSize, qrSize);
-            ctx.globalCompositeOperation = "source-over";
-            
-            // Fill the punched hole with white background for clean QR area
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(qrX, qrY, qrSize, qrSize);
-            
-            // Draw QR code in the clean white square
-            ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-            
-            if (enableBranding && borderShape !== "polaroid") {
-              if (topText) {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 3;
-                ctx.font = "bold 24px Inter, sans-serif";
-                ctx.textAlign = "center";
-                ctx.strokeText(topText, canvas.width / 2, 35);
-                ctx.fillText(topText, canvas.width / 2, 35);
-              }
-              if (bottomText) {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.strokeStyle = "#000000";
-                ctx.lineWidth = 3;
-                ctx.font = "16px Inter, sans-serif";
-                ctx.textAlign = "center";
-                const bottomY = canvas.height - 25;
-                ctx.strokeText(bottomText, canvas.width / 2, bottomY);
-                ctx.fillText(bottomText, canvas.width / 2, bottomY);
-              }
-            }
-            
-            if (borderShape === "polaroid" && polaroidText) {
-              ctx.fillStyle = "#000000";
-              ctx.font = "italic 20px 'Permanent Marker', cursive, Inter, sans-serif";
-              ctx.textAlign = "center";
-              ctx.fillText(polaroidText, canvas.width / 2, canvas.height - 50);
-            }
-            
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-            ctx.font = "10px Inter, sans-serif";
-            ctx.textAlign = "right";
-            ctx.fillText("Made with QR Social", canvas.width - 10, canvas.height - 10);
-            
-            setQrPreviewUrl(canvas.toDataURL("image/png"));
-            setIsGenerating(false);
-          };
-          bgImg.src = backgroundImage;
-        } else {
-          drawQR();
-        }
+        if (!cancelled) { setQrPreviewUrl(result.qrImageUrl); setIsGenerating(false); }
       } catch (err) {
-        console.error("QR preview error:", err);
-        setIsGenerating(false);
+        if (!cancelled) {
+          setQrPreviewUrl("");
+          setIsGenerating(false);
+          console.error("QR preview error:", err);
+        }
       }
     };
 
     const debounce = setTimeout(generatePreview, 300);
-    return () => clearTimeout(debounce);
-  }, [url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor, open]);
+    return () => { cancelled = true; clearTimeout(debounce); };
+  }, [scan?.dynamicSlug, moduleStyle, eyeStyle, eyeColor, url, foregroundColor, backgroundColor, borderColor, topText, bottomText, enableBranding, backgroundImage, imageFit, borderShape, polaroidText, canvasFillEnabled, canvasFillColor, open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -526,7 +244,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
     }
       
     if (isFreeUser) {
-      const updates: any = {};
+      const updates: any = { moduleStyle, eyeStyle, eyeColor };
       const normalizeValue = (val: any) => val || null;
       
       if (normalizeValue(title.trim()) !== normalizeValue(originalScan.title)) {
@@ -537,7 +255,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
       return;
     }
     
-    const updates: any = {};
+    const updates: any = { moduleStyle, eyeStyle, eyeColor };
     const normalizeValue = (val: any) => val || null;
       
     if (enableABTesting) {
@@ -734,6 +452,16 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                 </>
               )}
 
+
+                      <QRDesignControls moduleStyle={moduleStyle} eyeStyle={eyeStyle} eyeColor={eyeColor}
+                        foregroundColor={foregroundColor} backgroundColor={backgroundColor}
+                        onModuleStyle={setModuleStyle} onEyeStyle={setEyeStyle} onEyeColor={setEyeColor} onBackgroundColor={setBackgroundColor}
+                        onPreset={(preset) => {
+                          setModuleStyle(preset.moduleStyle); setEyeStyle(preset.eyeStyle);
+                          setEyeColor(preset.accent); setForegroundColor(preset.foreground);
+                          setBackgroundColor(preset.background); setBorderColor(preset.background);
+                          setBackgroundImage(null); setBorderShape("square"); setEnableBranding(false);
+                        }} />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="foreground">Foreground</Label>
@@ -760,7 +488,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                     <Input
                       id="background"
                       type="color"
-                      value={backgroundColor}
+                      value={backgroundColor === "transparent" ? "#FFFFFF" : backgroundColor}
                       onChange={(e) => setBackgroundColor(e.target.value)}
                       className="h-10 w-20"
                     />
@@ -962,7 +690,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={updateMutation.isPending}
+                  disabled={isGenerating || !qrPreviewUrl || updateMutation.isPending}
                   data-testid="button-save-changes"
                 >
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
@@ -1005,7 +733,7 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                   link.click();
                 }}
                 data-testid="button-download"
-                disabled={!qrPreviewUrl}
+                disabled={isGenerating || !qrPreviewUrl}
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download Preview

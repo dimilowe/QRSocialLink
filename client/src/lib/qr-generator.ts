@@ -1,7 +1,11 @@
+import { renderQRSvg, type ModuleStyle, type EyeStyle } from "./qr-design";
 type BorderShape = "square" | "circle" | "star" | "polaroid" | "diamond" | "heart";
 type ImageFit = "cover" | "contain" | "stretch";
 
 export interface GenerateQRParams {
+  moduleStyle?: ModuleStyle;
+  eyeStyle?: EyeStyle;
+  eyeColor?: string;
   targetUrl: string;
   foregroundColor: string;
   backgroundColor: string;
@@ -24,8 +28,8 @@ export interface GenerateQRResult {
 }
 
 function getShapeDimensions(shape: BorderShape) {
-  const borderSize = 60;
-  const qrSize = 400;
+  const borderSize = shape === "circle" ? 90 : 60;
+  const qrSize = shape === "circle" ? 340 : 400;
   
   if (shape === "polaroid") {
     return {
@@ -128,16 +132,23 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
     canvasFillColor,
   } = params;
 
-  const QRCode = (await import("qrcode")).default;
-  
-  const qrDataUrl = await QRCode.toDataURL(targetUrl, {
-    color: {
-      dark: foregroundColor,
-      light: backgroundColor,
-    },
-    width: 400,
-    margin: 1,
+  const svg = renderQRSvg(targetUrl, foregroundColor, backgroundColor, {
+    moduleStyle: params.moduleStyle ?? "square",
+    eyeStyle: params.eyeStyle ?? "square",
+    eyeColor: params.eyeColor || foregroundColor,
   });
+  const qrImage = new Image();
+  await new Promise<void>((resolve, reject) => {
+    qrImage.onload = () => resolve();
+    qrImage.onerror = () => reject(new Error("Unable to render QR code"));
+    qrImage.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  });
+  const rawCanvas = document.createElement("canvas");
+  rawCanvas.width = rawCanvas.height = 1600;
+  const rawCtx = rawCanvas.getContext("2d");
+  if (!rawCtx) throw new Error("Canvas not supported");
+  rawCtx.drawImage(qrImage, 0, 0, 1600, 1600);
+  const qrDataUrl = rawCanvas.toDataURL("image/png");
 
   if (!enableBranding && !backgroundImage && borderShape === "square") {
     return { qrImageUrl: qrDataUrl };
@@ -186,12 +197,6 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
     }
   };
 
-  const qrImage = new Image();
-  await new Promise((resolve) => {
-    qrImage.onload = resolve;
-    qrImage.src = qrDataUrl;
-  });
-
   const drawQROverlay = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
     ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
@@ -199,24 +204,18 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
 
     if (enableBranding && !isPolaroid) {
       if (topText) {
-        ctx.fillStyle = "#FFFFFF";
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 3;
+        ctx.fillStyle = backgroundImage ? "#FFFFFF" : foregroundColor;
         ctx.font = "bold 24px Inter, sans-serif";
         ctx.textAlign = "center";
-        ctx.strokeText(topText, canvasWidth / 2, 35);
-        ctx.fillText(topText, canvasWidth / 2, 35);
+        ctx.fillText(topText, canvasWidth / 2, 35, canvasWidth - 48);
       }
 
       if (bottomText) {
-        ctx.fillStyle = "#FFFFFF";
-        ctx.strokeStyle = "#000000";
-        ctx.lineWidth = 3;
+        ctx.fillStyle = backgroundImage ? "#FFFFFF" : foregroundColor;
         ctx.font = "16px Inter, sans-serif";
         ctx.textAlign = "center";
         const bottomY = isPolaroid ? canvasHeight - 125 : canvasHeight - 25;
-        ctx.strokeText(bottomText, canvasWidth / 2, bottomY);
-        ctx.fillText(bottomText, canvasWidth / 2, bottomY);
+        ctx.fillText(bottomText, canvasWidth / 2, bottomY, canvasWidth - 48);
       }
     }
 
@@ -239,8 +238,9 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
     const overlayCtx = overlayCanvas.getContext("2d");
     if (!overlayCtx) throw new Error("Canvas not supported");
 
-    overlayCanvas.width = totalWidth;
-    overlayCanvas.height = totalHeight;
+    overlayCanvas.width = totalWidth * 3;
+    overlayCanvas.height = totalHeight * 3;
+    overlayCtx.scale(3, 3);
 
     drawQROverlay(overlayCtx, totalWidth, totalHeight);
 
@@ -250,42 +250,40 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
     const compositeCtx = compositeCanvas.getContext("2d");
     if (!compositeCtx) throw new Error("Canvas not supported");
 
-    compositeCanvas.width = totalWidth;
-    compositeCanvas.height = totalHeight;
+    compositeCanvas.width = totalWidth * 3;
+    compositeCanvas.height = totalHeight * 3;
+    compositeCtx.scale(3, 3);
 
-    const compositeDataUrl = await new Promise<string>((resolve) => {
+    const compositeDataUrl = await new Promise<string>((resolve, reject) => {
       const bgImg = new Image();
       bgImg.onload = () => {
         if (canvasFillEnabled) {
           compositeCtx.fillStyle = canvasFillColor;
-          compositeCtx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+          compositeCtx.fillRect(0, 0, totalWidth, totalHeight);
         } else {
-          compositeCtx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+          compositeCtx.clearRect(0, 0, totalWidth, totalHeight);
         }
         
         compositeCtx.save();
-        createShapePath(compositeCtx, borderShape, compositeCanvas.width, compositeCanvas.height);
+        createShapePath(compositeCtx, borderShape, totalWidth, totalHeight);
         compositeCtx.clip();
-        drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, compositeCanvas.width, compositeCanvas.height);
+        drawImageOnCanvas(compositeCtx, bgImg, bgImg.width, bgImg.height, totalWidth, totalHeight);
         compositeCtx.restore();
         
-        compositeCtx.globalCompositeOperation = "destination-out";
-        compositeCtx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-        
-        compositeCtx.globalCompositeOperation = "source-over";
         drawQROverlay(compositeCtx, totalWidth, totalHeight);
 
         if (borderShape !== "square") {
           compositeCtx.save();
           compositeCtx.lineWidth = 8;
           compositeCtx.strokeStyle = borderColor;
-          createShapePath(compositeCtx, borderShape, compositeCanvas.width, compositeCanvas.height);
+          createShapePath(compositeCtx, borderShape, totalWidth, totalHeight);
           compositeCtx.stroke();
           compositeCtx.restore();
         }
         
         resolve(compositeCanvas.toDataURL("image/png"));
       };
+      bgImg.onerror = () => reject(new Error("Unable to load background image"));
       bgImg.src = backgroundImage;
     });
 
@@ -299,27 +297,29 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas not supported");
 
-  canvas.width = totalWidth;
-  canvas.height = totalHeight;
+  canvas.width = totalWidth * 3;
+  canvas.height = totalHeight * 3;
+  ctx.scale(3, 3);
 
   if (canvasFillEnabled) {
     ctx.fillStyle = canvasFillColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, totalWidth, totalHeight);
   } else {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, totalWidth, totalHeight);
   }
 
   ctx.save();
-  createShapePath(ctx, borderShape, canvas.width, canvas.height);
+  createShapePath(ctx, borderShape, totalWidth, totalHeight);
   ctx.clip();
   
   if (backgroundImage) {
     const bgImg = new Image();
-    await new Promise((resolve) => {
-      bgImg.onload = resolve;
+    await new Promise<void>((resolve, reject) => {
+      bgImg.onload = () => resolve();
+      bgImg.onerror = () => reject(new Error("Unable to load background image"));
       bgImg.src = backgroundImage;
     });
-    drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, canvas.width, canvas.height);
+    drawImageOnCanvas(ctx, bgImg, bgImg.width, bgImg.height, totalWidth, totalHeight);
   } else {
     ctx.fillStyle = borderColor;
     ctx.fill();
@@ -331,12 +331,12 @@ export async function generateBrandedQR(params: GenerateQRParams): Promise<Gener
     ctx.save();
     ctx.lineWidth = 8;
     ctx.strokeStyle = borderColor;
-    createShapePath(ctx, borderShape, canvas.width, canvas.height);
+    createShapePath(ctx, borderShape, totalWidth, totalHeight);
     ctx.stroke();
     ctx.restore();
   }
 
-  drawQROverlay(ctx, canvas.width, canvas.height);
+  drawQROverlay(ctx, totalWidth, totalHeight);
 
   return { qrImageUrl: canvas.toDataURL("image/png") };
 }

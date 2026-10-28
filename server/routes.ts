@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import Stripe from "stripe";
+import sharp from "sharp";
 import { nanoid } from "nanoid";
 import { insertScanSchema, insertCommentSchema, insertCampaignSchema, insertDestinationSchema, insertOverlayRenditionSchema, insertFeedbackSchema, PLAN_TIERS, PLAN_LIMITS, type PlanTier } from "@shared/schema";
 import { createABStrategy } from "./services/ab-testing";
@@ -17,12 +18,12 @@ import { registerStripeWebhookRoute } from "./stripe-webhook";
 
 const execAsync = promisify(exec);
 
-if (!process.env.STRIPE_SECRET_KEY) {
+if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-11-20.acacia" as any,
-});
+}) : null;
 
 const PLAN_PRICES = {
   starter: {
@@ -319,6 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/create-portal-session", async (req, res) => {
+    if (!stripe) return res.status(503).json({ message: "Payments are not configured for local development" });
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -1093,9 +1095,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  registerStripeWebhookRoute(app, storage, stripe);
+  if (stripe) {
+    registerStripeWebhookRoute(app, storage, stripe);
+  } else {
+    app.post("/api/webhooks/stripe", (_req, res) => {
+      res.status(503).json({ message: "Payments are not configured for local development" });
+    });
+  }
 
   app.post("/api/create-checkout-session", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Payments are not configured for local development" });
     const { planTier } = req.body;
 
     if (!planTier || !["starter", "pro", "unlimited"].includes(planTier)) {
@@ -1210,6 +1219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Confirm payment without exposing email addresses or credentials to guests.
   app.get("/api/checkout-account", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Payments are not configured for local development" });
     const sessionId = req.query.session_id as string;
     if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
 
@@ -1242,18 +1252,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const backgroundBuffer = Buffer.from(backgroundImageData.split(',')[1], 'base64');
       await fs.writeFile(backgroundPath, backgroundBuffer);
 
-      const qrBuffer = Buffer.from(qrCodeData.split(',')[1], 'base64');
+      // Keep animated exports compact and size the background to the complete overlay.
+      // High-resolution PNG overlays must not be cropped by the GIF's output canvas.
+      const qrBuffer = await sharp(Buffer.from(qrCodeData.split(',')[1], 'base64'))
+        .resize({ width: 520, withoutEnlargement: true }).png().toBuffer();
+      const { width, height } = await sharp(qrBuffer).metadata();
+      if (!width || !height) throw new Error("Invalid QR overlay dimensions");
       await fs.writeFile(qrPath, qrBuffer);
 
       let filterComplex = '';
       if (imageFit === 'cover') {
-        filterComplex = '[0:v]scale=400:400:force_original_aspect_ratio=increase,crop=400:400[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+        filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}[bg];[bg][1:v]overlay=0:0`;
       } else if (imageFit === 'contain') {
-        filterComplex = '[0:v]scale=400:400:force_original_aspect_ratio=decrease,pad=400:400:(ow-iw)/2:(oh-ih)/2:white[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+        filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:white[bg];[bg][1:v]overlay=0:0`;
       } else {
-        filterComplex = '[0:v]scale=400:400[bg];[bg][1:v]overlay=(W-w)/2:(H-h)/2';
+        filterComplex = `[0:v]scale=${width}:${height}[bg];[bg][1:v]overlay=0:0`;
       }
 
+      filterComplex += '[composed];[composed]split[a][b];[a]palettegen[p];[b][p]paletteuse=dither=none';
       const ffmpegCommand = `ffmpeg -i "${backgroundPath}" -i "${qrPath}" -filter_complex "${filterComplex}" -y "${outputPath}"`;
       
       await execAsync(ffmpegCommand, { maxBuffer: 10 * 1024 * 1024 });

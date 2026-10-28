@@ -82,15 +82,20 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  // Serve both the API and client. Avoid macOS AirPlay's port 5000 locally.
+  const port = Number(process.env.PORT || (app.get("env") === "development" ? "3000" : "5000"));
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    console.error(error.code === "EADDRINUSE"
+      ? `Port ${port} is already in use. Set PORT in .env to an available port.`
+      : `Unable to start server: ${error.message}`);
+    process.exit(1);
+  });
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
     
