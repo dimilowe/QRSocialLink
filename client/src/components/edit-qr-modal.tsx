@@ -1,3 +1,4 @@
+import { QRScanCheck } from "@/components/qr-scan-check";
 import { QRDesignControls } from "@/components/qr-design-controls";
 import { type ModuleStyle, type EyeStyle } from "@/lib/qr-design";
 import { generateBrandedQR } from "@/lib/qr-generator";
@@ -719,6 +720,10 @@ export function EditQRModal({ scan, open, onOpenChange }: EditQRModalProps) {
                   <p className="text-sm text-muted-foreground">Enter a URL to see preview</p>
                 )}
               </div>
+              <QRScanCheck imageUrl={qrPreviewUrl}
+                expectedUrl={scan?.dynamicSlug ? `${window.location.origin}/q/${scan.dynamicSlug}` : url}
+                generating={isGenerating} animated={backgroundImage?.startsWith("data:image/gif")}
+                transparent={backgroundColor === "transparent" && !backgroundImage} />
               <p className="text-xs text-muted-foreground text-center">
                 Preview updates automatically as you make changes
               </p>

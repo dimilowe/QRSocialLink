@@ -1,3 +1,4 @@
+import { QRScanCheck } from "@/components/qr-scan-check";
 import { QRDesignControls } from "@/components/qr-design-controls";
 import { type ModuleStyle, type EyeStyle } from "@/lib/qr-design";
 import { generateBrandedQR } from "@/lib/qr-generator";
@@ -807,6 +808,9 @@ export default function CreateQRPage() {
                   </p>
                 )}
               </div>
+
+              <QRScanCheck imageUrl={qrImageUrl} expectedUrl={url} generating={isGenerating}
+                animated={backgroundImageType === "image/gif"} transparent={backgroundColor === "transparent" && !backgroundImage} />
 
               {qrImageUrl && (
                 <div className="space-y-4">
